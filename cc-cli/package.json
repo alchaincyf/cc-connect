@@ -1,10 +1,10 @@
 {
   "name": "huashu-cc",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Claude Code 移动控制台 CLI 工具 - 在手机上远程控制 Claude Code",
   "main": "dist/index.js",
   "bin": {
-    "cc": "./dist/index.js"
+    "huashu-cc": "./dist/index.js"
   },
   "scripts": {
     "build": "tsc",

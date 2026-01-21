@@ -19,13 +19,13 @@ npm install -g huashu-cc
 
 ```bash
 # 启动会话（显示配对二维码）
-cc start
+huashu-cc start
 
 # 自定义会话名称
-cc start -n "我的项目"
+huashu-cc start -n "我的项目"
 
 # 使用自定义中继服务器（推荐敏感项目使用）
-cc start -s "wss://your-relay-server.com"
+huashu-cc start -s "wss://your-relay-server.com"
 ```
 
 ## 配套 App
@@ -42,7 +42,7 @@ App 功能：
 
 ```
 ┌─────────────┐                      ┌─────────────┐
-│   iOS App   │  ◄───── 同步 ──────► │   cc start  │
+│   iOS App   │  ◄───── 同步 ──────► │   huashu-cc start  │
 │             │      WebSocket       │             │
 └─────────────┘                      └──────┬──────┘
        │                                    │ PTY
@@ -53,7 +53,7 @@ App 功能：
 └─────────────┘
 ```
 
-1. `cc start` 启动 Claude Code，包装在 PTY 中
+1. `huashu-cc start` 启动 Claude Code，包装在 PTY 中
 2. 解析输出为结构化消息，通过 WebSocket 发送
 3. 云端中继服务转发消息到 iOS App
 4. App 可发送指令回传到 CLI
@@ -148,7 +148,7 @@ https://my-cc-relay.你的用户名.workers.dev
 **6. 使用自建服务**
 
 ```bash
-cc start -s "wss://my-cc-relay.你的用户名.workers.dev"
+huashu-cc start -s "wss://my-cc-relay.你的用户名.workers.dev"
 ```
 
 ### Cloudflare 免费额度
