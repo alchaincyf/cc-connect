@@ -12,8 +12,10 @@
 ## 安装
 
 ```bash
-npm install -g huashu-cc
+npm install -g huashu-cc@latest
 ```
+
+> 注意：使用 `@latest` 确保安装最新版本，避免 npm 缓存问题。
 
 ## 使用
 
