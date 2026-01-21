@@ -1,6 +1,6 @@
 {
   "name": "huashu-cc",
-  "version": "1.0.4",
+  "version": "1.0.7",
   "description": "Claude Code 移动控制台 CLI 工具 - 在手机上远程控制 Claude Code",
   "main": "dist/index.js",
   "bin": {
@@ -11,7 +11,7 @@
     "dev": "ts-node src/index.ts",
     "start": "node dist/index.js",
     "prepublishOnly": "npm run build",
-    "postinstall": "npm rebuild node-pty || echo '⚠️  node-pty 编译失败，请手动运行: npm rebuild node-pty'"
+    "postinstall": "node -e \"try { require('node-pty').spawn('/bin/sh', [], {}).kill() } catch(e) { console.log('编译 node-pty...'); require('child_process').execSync('npx node-gyp rebuild', {stdio: 'inherit', cwd: require('path').join(__dirname, 'node_modules/node-pty')}) }\""
   },
   "keywords": [
     "claude",
