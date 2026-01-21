@@ -1,0 +1,46 @@
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Xcode
+build/
+DerivedData/
+*.xcuserstate
+xcuserdata/
+
+# Swift Package Manager
+.build/
+Packages/
+Package.resolved
+
+# CocoaPods
+Pods/
+
+# Node.js
+node_modules/
+npm-debug.log*
+
+# TypeScript
+*.js.map
+
+# Environment
+.env
+.env.local
+
+# IDE
+.vscode/
+.idea/
+
+# Logs
+*.log
+
+# Test files
+test.html
+
+# Third-party libraries (use SPM instead)
+SwiftTerm/
+
+# Cloudflare Wrangler
+.wrangler/
+.dev.vars

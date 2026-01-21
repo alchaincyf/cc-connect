@@ -1,0 +1,21 @@
+# Source files
+src/
+
+# TypeScript config
+tsconfig.json
+
+# Development
+node_modules/
+.DS_Store
+
+# Test
+test/
+*.test.ts
+
+# IDE
+.vscode/
+.idea/
+
+# Logs
+*.log
+npm-debug.log*
