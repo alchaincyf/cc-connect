@@ -42,19 +42,19 @@ struct OnboardingView: View {
                     StepCard(
                         number: "1",
                         title: "在终端安装 CLI",
-                        command: "npm i -g cc-connect",
-                        isCopied: copiedCommand == "npm i -g cc-connect"
+                        command: "npm i -g huashu-cc@latest",
+                        isCopied: copiedCommand == "npm i -g huashu-cc@latest"
                     ) {
-                        copyCommand("npm i -g cc-connect")
+                        copyCommand("npm i -g huashu-cc@latest")
                     }
 
                     StepCard(
                         number: "2",
                         title: "运行命令",
-                        command: "cc start",
-                        isCopied: copiedCommand == "cc start"
+                        command: "huashu-cc start",
+                        isCopied: copiedCommand == "huashu-cc start"
                     ) {
-                        copyCommand("cc start")
+                        copyCommand("huashu-cc start")
                     }
 
                     StepCard(
