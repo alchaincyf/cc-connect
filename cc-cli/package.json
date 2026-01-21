@@ -1,6 +1,6 @@
 {
   "name": "huashu-cc",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Claude Code 移动控制台 CLI 工具 - 在手机上远程控制 Claude Code",
   "main": "dist/index.js",
   "bin": {
@@ -50,6 +50,6 @@
     "typescript": "^5.0.0"
   },
   "engines": {
-    "node": ">=18.0.0"
+    "node": ">=18.0.0 <23.0.0"
   }
 }

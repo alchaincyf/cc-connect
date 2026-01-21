@@ -194,8 +194,28 @@ huashu-cc start -s "wss://my-cc-relay.你的用户名.workers.dev"
 
 ## 系统要求
 
-- Node.js >= 18.0.0
+- **Node.js 18.x 或 20.x (LTS)**
+  - 推荐使用 LTS 版本，非 LTS 版本（如 v21、v23）可能遇到原生模块编译问题
+  - 如遇 `posix_spawnp failed` 错误，请切换到 Node LTS 版本
 - 已安装 Claude Code (`npm install -g @anthropic/claude-code`)
+- macOS/Linux（Windows 暂不支持）
+
+### 常见问题
+
+**Q: 安装后运行报错 `posix_spawnp failed`**
+
+A: 这是因为 `node-pty` 原生模块与当前 Node 版本不兼容。解决方案：
+
+```bash
+# 方案 1: 切换到 Node LTS 版本（推荐）
+nvm install 20
+nvm use 20
+npm install -g huashu-cc
+
+# 方案 2: 手动重新编译（需要 Xcode 命令行工具）
+cd $(npm root -g)/huashu-cc
+npm rebuild node-pty
+```
 
 ## 开源协议
 
