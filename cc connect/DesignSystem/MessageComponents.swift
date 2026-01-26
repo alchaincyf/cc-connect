@@ -36,7 +36,7 @@ struct CCMessageRow: View {
 
 // MARK: - Claude Message Row
 
-/// Claude 消息行 - 极简设计，用细线指示器替代图标
+/// Claude 消息行 - 极简设计，支持 Markdown 渲染
 struct CCClaudeMessageRow: View {
     let message: CCMessage
 
@@ -47,12 +47,8 @@ struct CCClaudeMessageRow: View {
                 .fill(CCColor.accentClaude)
                 .frame(width: 2)
 
-            // 内容 - 无标签，直接显示文本
-            Text(message.content)
-                .font(.ccBody)
-                .foregroundColor(CCColor.textPrimary)
-                .textSelection(.enabled)
-                .lineSpacing(4)
+            // 内容 - 使用 Markdown 渲染
+            CCMarkdownView(content: message.content, textColor: CCColor.textPrimary)
 
             Spacer(minLength: 0)
         }

@@ -35,10 +35,10 @@ struct OnboardingView: View {
                     .frame(height: CCSpacing.xxxl)
 
                 // 步骤 - 纯文字，大留白
-                VStack(alignment: .leading, spacing: CCSpacing.xl) {
+                VStack(alignment: .leading, spacing: CCSpacing.lg) {
                     StepText(
                         number: "1",
-                        title: "安装",
+                        title: "安装 CLI",
                         command: "npm i -g huashu-cc@latest",
                         isCopied: copiedCommand == "npm i -g huashu-cc@latest"
                     ) {
@@ -47,7 +47,17 @@ struct OnboardingView: View {
 
                     StepText(
                         number: "2",
-                        title: "启动",
+                        title: "配置 Hooks",
+                        command: "huashu-cc install-hooks",
+                        description: "首次安装后只需执行一次",
+                        isCopied: copiedCommand == "huashu-cc install-hooks"
+                    ) {
+                        copyCommand("huashu-cc install-hooks")
+                    }
+
+                    StepText(
+                        number: "3",
+                        title: "启动会话",
                         command: "huashu-cc start",
                         isCopied: copiedCommand == "huashu-cc start"
                     ) {
@@ -55,7 +65,7 @@ struct OnboardingView: View {
                     }
 
                     StepText(
-                        number: "3",
+                        number: "4",
                         title: "扫码连接",
                         description: nil
                     )

@@ -17,7 +17,17 @@ npm install -g huashu-cc@latest
 
 > 注意：使用 `@latest` 确保安装最新版本，避免 npm 缓存问题。
 
-## 使用
+## 快速开始
+
+### 1. 安装 Hooks（首次安装必须）
+
+```bash
+huashu-cc install-hooks
+```
+
+> **重要**：Hooks 配置让 Claude Code 能够将状态同步到手机。首次安装后只需执行一次。
+
+### 2. 启动会话
 
 ```bash
 # 启动会话（显示配对二维码）
@@ -28,6 +38,20 @@ huashu-cc start -n "我的项目"
 
 # 使用自定义中继服务器（推荐敏感项目使用）
 huashu-cc start -s "wss://your-relay-server.com"
+```
+
+### 3. 用 App 扫码连接
+
+打开 CC Connect App，扫描终端中的二维码即可配对。
+
+## 其他命令
+
+```bash
+# 检查 Hooks 配置状态
+huashu-cc check-hooks
+
+# 查看 Hooks 配置内容（不安装）
+huashu-cc install-hooks --show
 ```
 
 ## 配套 App

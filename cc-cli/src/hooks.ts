@@ -410,7 +410,6 @@ export function startHookServer(handler: EventHandler): Promise<number> {
     });
 
     httpServer.listen(HOOK_SERVER_PORT, '127.0.0.1', () => {
-      console.log(`[Hook Server] 监听 http://127.0.0.1:${HOOK_SERVER_PORT}`);
       resolve(HOOK_SERVER_PORT);
     });
   });

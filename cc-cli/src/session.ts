@@ -98,10 +98,9 @@ export async function startSession(options: SessionOptions): Promise<void> {
   try {
     await startHookServer(handleHookEvent);
     hookServerRunning = true;
-    console.log(`[Hook 服务器] 已启动，端口 ${HOOK_SERVER_PORT}`);
   } catch (err: any) {
     hookServerRunning = false;
-    console.warn('[Hook 服务器] 启动失败，将使用备用模式:', err.message);
+    // Hook 服务器启动失败时静默使用备用模式
   }
 
   // 2. 启动 PTY shell
@@ -282,8 +281,6 @@ function processFallbackOutput(): void {
 function handleHookEvent(event: ProcessedEvent): void {
   if (!state.wsClient?.isConnected) return;
 
-  console.log(`[Hook] 收到事件: ${event.event}`);
-
   // 发送状态更新
   if (event.status) {
     state.wsClient.send({
@@ -377,8 +374,7 @@ function displayQRCode(): void {
     console.log(code);
   });
 
-  console.log(`\n会话: ${state.name}`);
-  console.log(`Hook 服务器: http://127.0.0.1:${HOOK_SERVER_PORT}\n`);
+  console.log(`\n会话: ${state.name}\n`);
 }
 
 // ============================================================================

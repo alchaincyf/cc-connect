@@ -411,10 +411,15 @@ Text(String(localized: "key_name"))
 | 项目 | 内容 |
 |------|------|
 | **阶段** | Phase 3 开发 - Hooks 架构稳定 |
-| **进度** | v1.1.1 修复消息重复和状态显示问题 |
-| **上次决策** | 修复备用模式在 Hooks 运行时仍然执行的问题 |
+| **进度** | v1.1.2 添加 Markdown 支持，优化文档 |
+| **上次决策** | 添加 iOS Markdown 渲染，更新安装指引 |
 
 ### 最新完成 (2026-01-26)
+
+**v1.1.2 功能优化**
+- ✅ **Markdown 渲染** - iOS 端支持 Markdown 格式（标题、列表、代码块、引用等）
+- ✅ **移除调试日志** - CLI 端移除 Hook 服务器相关的调试输出
+- ✅ **更新安装指引** - README 和 App 引导页添加 Hooks 安装步骤
 
 **v1.1.1 Bug 修复**
 - ✅ **禁用备用模式** - 当 Hook 服务器运行时，禁用 fallbackStateDetection
@@ -672,8 +677,9 @@ npm publish --access public
 ### 当前版本
 
 - **包名**: huashu-cc
-- **最新版本**: 1.1.1
+- **最新版本**: 1.1.2
 - **安装命令**: `npm install -g huashu-cc@latest`
+- **首次配置**: `huashu-cc install-hooks`（必须）
 - **可执行文件**: `cc`, `huashu-cc`, `cc-hook-notify`
 
 ---
