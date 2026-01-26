@@ -69,6 +69,8 @@ const state = {
     shell: null,
     wsClient: null,
 };
+// 是否已经收到过配对消息（防止重复打印）
+let hasPaired = false;
 // ============================================================================
 // 消息去重
 // ============================================================================
@@ -195,8 +197,10 @@ const THINKING_KEYWORDS = [
     'Noodling', 'Contemplating', 'Deliberating', 'Mulling'
 ];
 function fallbackStateDetection(data) {
-    // 如果 Hook 服务器已运行，不使用备用模式
-    if (hookServerRunning)
+    // 只有当 Hooks 已配置且 Hook 服务器运行时，才跳过备用模式
+    // 否则即使 Hook 服务器启动了，如果 Hooks 没配置，也不会有事件触发
+    const hooksInstalled = (0, hooks_1.checkHooksInstalled)();
+    if (hooksInstalled && hookServerRunning)
         return;
     if (!state.wsClient?.isConnected)
         return;
@@ -321,8 +325,11 @@ function handleRemoteMessage(msg) {
             state.wsClient?.send({ type: 'pong' });
             break;
         case 'paired':
-            // 手机已连接
-            console.log('\n[已连接] 手机客户端已配对\n');
+            // 手机已连接（只打印一次）
+            if (!hasPaired) {
+                hasPaired = true;
+                console.log('\n[已连接] 手机客户端已配对\n');
+            }
             break;
         default:
             break;

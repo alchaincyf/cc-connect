@@ -308,6 +308,12 @@ class WebSocketManager: NSObject, ObservableObject {
     private func loadHistoryMessages() {
         guard let session = session else { return }
 
+        // 避免重复加载 - 如果已经有消息，不再加载
+        guard messages.isEmpty else {
+            print("📚 跳过历史消息加载（已有 \(messages.count) 条消息）")
+            return
+        }
+
         // 将 SwiftData Message 转换为 CCMessage
         let sortedMessages = session.messages.sorted { $0.timestamp < $1.timestamp }
         messages = sortedMessages.map { msg in
@@ -553,8 +559,14 @@ class WebSocketManager: NSObject, ObservableObject {
 
         case "paired":
             print("🎉 已配对!")
-            let msg = CCMessage(type: .system, content: "已连接到 Claude Code")
-            messages.append(msg)
+            // 避免重复添加配对消息：检查最近是否已有相同的系统消息
+            let recentPairedMessage = messages.suffix(5).contains { msg in
+                msg.type == .system && msg.content == "已连接到 Claude Code"
+            }
+            if !recentPairedMessage {
+                let msg = CCMessage(type: .system, content: "已连接到 Claude Code")
+                messages.append(msg)
+            }
 
         case "cli_disconnected":
             connectionState = .failed("CLI 已断开")
@@ -725,6 +737,17 @@ class WebSocketManager: NSObject, ObservableObject {
             filePath: tool?.filePath ?? (data["filePath"] as? String),
             options: legacyOptions
         )
+
+        // 消息去重：检查是否已存在相同内容和相近时间戳的消息
+        let isDuplicate = messages.contains { existing in
+            existing.content == message.content &&
+            existing.type == message.type &&
+            abs(existing.timestamp - message.timestamp) < 2000 // 2秒内相同内容视为重复
+        }
+        if isDuplicate {
+            print("🔄 跳过重复消息: \(content.prefix(30))...")
+            return
+        }
 
         // 如果是交互类型，设置当前交互
         if type.requiresResponse || requiresResponse == true {
