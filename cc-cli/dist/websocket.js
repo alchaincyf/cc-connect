@@ -41,7 +41,7 @@ class WebSocketClient {
                     this.messageHandler?.(msg);
                 }
                 catch (e) {
-                    console.error('解析消息失败:', e);
+                    // 忽略解析错误
                 }
             });
             this.ws.on('close', () => {
@@ -70,15 +70,12 @@ class WebSocketClient {
     }
     async attemptReconnect() {
         if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-            console.error('重连失败次数过多，放弃重连');
             return;
         }
         this.reconnectAttempts++;
-        console.log(`尝试重连 (${this.reconnectAttempts}/${this.maxReconnectAttempts})...`);
         await new Promise((resolve) => setTimeout(resolve, this.reconnectDelay));
         try {
             await this.connect();
-            console.log('✅ 重连成功');
         }
         catch (e) {
             // connect 会触发 onClose，自动继续重连

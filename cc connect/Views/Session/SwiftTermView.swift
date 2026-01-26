@@ -69,10 +69,6 @@ struct TerminalSessionView: View {
             ToolbarItem(placement: .navigationBarTrailing) {
                 ConnectionStatusBadge(state: wsManager.connectionState)
             }
-            ToolbarItemGroup(placement: .keyboard) {
-                Spacer()
-                Button("完成") { dismissKeyboard() }
-            }
         }
         .onAppear { connectWebSocket() }
         .onDisappear { wsManager.disconnect() }

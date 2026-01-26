@@ -19,6 +19,8 @@ struct ScanView: View {
     @State private var isConnecting = false
     @State private var errorMessage: String?
     @State private var showManualInput = false
+    @State private var showStartupOptions = false
+    @State private var pairedSession: Session?
 
     var body: some View {
         NavigationStack {
@@ -108,6 +110,9 @@ struct ScanView: View {
                     .foregroundColor(.ccPrimary)
                 }
             }
+            .fullScreenCover(isPresented: $showStartupOptions) {
+                startupOptionsSheet
+            }
         }
     }
 
@@ -122,9 +127,11 @@ struct ScanView: View {
         errorMessage = nil
 
         // 创建 Session 并连接
+        // 使用配对码中的会话名称（来自工作目录名），如果没有则用默认值
+        let sessionName = pairingInfo.sessionName ?? "新会话"
         let session = Session(
             id: pairingInfo.sessionId,
-            name: "新会话",
+            name: sessionName,
             status: .idle,
             lastActivity: Date(),
             isConnected: true,
@@ -138,7 +145,41 @@ struct ScanView: View {
         modelContext.insert(session)
 
         isConnecting = false
-        onPaired(session)
+
+        // 显示启动选项
+        pairedSession = session
+        showStartupOptions = true
+    }
+}
+
+// MARK: - Startup Options Sheet Extension
+
+extension ScanView {
+    @ViewBuilder
+    var startupOptionsSheet: some View {
+        if let session = pairedSession {
+            StartupOptionsView(
+                session: session,
+                onStartClaude: {
+                    // 发送 claude 命令启动
+                    session.pendingStartupCommand = "claude"
+                    showStartupOptions = false
+                    onPaired(session)
+                },
+                onStartWithFlags: {
+                    // 发送 claude --dangerously-skip-permissions
+                    session.pendingStartupCommand = "claude --dangerously-skip-permissions"
+                    showStartupOptions = false
+                    onPaired(session)
+                },
+                onWait: {
+                    // 不发送命令，直接进入会话
+                    session.pendingStartupCommand = nil
+                    showStartupOptions = false
+                    onPaired(session)
+                }
+            )
+        }
     }
 }
 

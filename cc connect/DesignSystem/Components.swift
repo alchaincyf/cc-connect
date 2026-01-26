@@ -2,14 +2,14 @@
 //  Components.swift
 //  cc connect
 //
-//  Design System v2.0 - 核心组件
+//  Design System v3.0 - MUJI 风格核心组件
 //
 
 import SwiftUI
 
 // MARK: - Buttons
 
-/// 主按钮
+/// 主按钮 - MUJI 风格：圆角更大，颜色更柔和
 struct CCPrimaryButton: View {
     let title: String
     let action: () -> Void
@@ -22,30 +22,30 @@ struct CCPrimaryButton: View {
             UIImpactFeedbackGenerator(style: .light).impactOccurred()
             action()
         }) {
-            HStack(spacing: CCSpacing.xs) {
+            HStack(spacing: CCSpacing.sm) {
                 if isLoading {
                     ProgressView()
-                        .tint(.white)
+                        .tint(CCColor.bgPrimary)
                         .scaleEffect(0.9)
                 }
                 if let icon = icon, !isLoading {
                     Image(systemName: icon)
-                        .font(.system(size: 16, weight: .semibold))
+                        .font(.system(size: 15, weight: .medium))
                 }
                 Text(title)
-                    .font(.ccHeadline)
+                    .font(.ccBody)
             }
             .frame(maxWidth: .infinity)
             .frame(height: CCSize.buttonHeight)
             .background(isDisabled ? CCColor.textDisabled : CCColor.accentPrimary)
-            .foregroundColor(.white)
-            .clipShape(RoundedRectangle(cornerRadius: CCRadius.sm))
+            .foregroundColor(CCColor.bgPrimary)
+            .clipShape(RoundedRectangle(cornerRadius: CCRadius.lg))  // 更大圆角
         }
         .disabled(isDisabled || isLoading)
     }
 }
 
-/// 次要按钮
+/// 次要按钮 - MUJI 风格：无边框，纯文字
 struct CCSecondaryButton: View {
     let title: String
     let action: () -> Void
@@ -56,23 +56,17 @@ struct CCSecondaryButton: View {
             UIImpactFeedbackGenerator(style: .light).impactOccurred()
             action()
         }) {
-            HStack(spacing: CCSpacing.xs) {
+            HStack(spacing: CCSpacing.sm) {
                 if let icon = icon {
                     Image(systemName: icon)
-                        .font(.system(size: 16, weight: .medium))
+                        .font(.system(size: 15, weight: .medium))
                 }
                 Text(title)
-                    .font(.ccHeadline)
+                    .font(.ccBody)
             }
             .frame(maxWidth: .infinity)
             .frame(height: CCSize.buttonHeight)
-            .background(CCColor.bgTertiary)
-            .foregroundColor(CCColor.textPrimary)
-            .clipShape(RoundedRectangle(cornerRadius: CCRadius.sm))
-            .overlay(
-                RoundedRectangle(cornerRadius: CCRadius.sm)
-                    .stroke(CCColor.borderDefault, lineWidth: 1)
-            )
+            .foregroundColor(CCColor.textSecondary)
         }
     }
 }
@@ -270,7 +264,7 @@ struct CCConnectionBadge: View {
 
 // MARK: - Input Components
 
-/// 聊天输入栏
+/// 聊天输入栏 - MUJI 风格：简洁，无装饰
 struct CCChatInputBar: View {
     @Binding var text: String
     var isFocused: FocusState<Bool>.Binding
@@ -278,41 +272,44 @@ struct CCChatInputBar: View {
     let onInterrupt: () -> Void
 
     var body: some View {
-        HStack(spacing: CCSpacing.sm) {
-            // 中断按钮
-            Button(action: {
-                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                onInterrupt()
-            }) {
-                Image(systemName: CCIcon.interrupt)
-                    .font(.system(size: CCSize.interruptButtonSize))
-                    .foregroundColor(CCColor.accentDanger.opacity(0.8))
-            }
+        VStack(spacing: 0) {
+            // 顶部细分隔线
+            Rectangle()
+                .fill(CCColor.borderMuted)
+                .frame(height: 0.5)
 
-            // 输入框
-            TextField("输入消息...", text: $text, axis: .vertical)
-                .font(.ccBody)
-                .padding(.horizontal, CCSpacing.inputPadding)
-                .padding(.vertical, CCSpacing.sm)
-                .background(CCColor.bgTertiary)
-                .clipShape(RoundedRectangle(cornerRadius: 20))
-                .focused(isFocused)
-                .lineLimit(1...4)
-                .onSubmit(onSend)
+            HStack(spacing: CCSpacing.md) {
+                // 中断按钮 - 更小更克制
+                Button(action: {
+                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                    onInterrupt()
+                }) {
+                    Image(systemName: CCIcon.interrupt)
+                        .font(.system(size: 18))
+                        .foregroundColor(CCColor.textTertiary)
+                }
 
-            // 发送按钮
-            Button(action: {
-                UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                onSend()
-            }) {
-                Image(systemName: CCIcon.send)
-                    .font(.system(size: CCSize.sendButtonSize))
-                    .foregroundColor(text.isEmpty ? CCColor.textDisabled : CCColor.accentPrimary)
+                // 输入框 - 无背景，纯文字
+                TextField("输入...", text: $text, axis: .vertical)
+                    .font(.ccBody)
+                    .focused(isFocused)
+                    .lineLimit(1...4)
+                    .onSubmit(onSend)
+
+                // 发送按钮 - 简化
+                Button(action: {
+                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    onSend()
+                }) {
+                    Image(systemName: CCIcon.send)
+                        .font(.system(size: 20))
+                        .foregroundColor(text.isEmpty ? CCColor.textDisabled : CCColor.accentPrimary)
+                }
+                .disabled(text.isEmpty)
             }
-            .disabled(text.isEmpty)
+            .padding(.horizontal, CCSpacing.lg)
+            .padding(.vertical, CCSpacing.md)
         }
-        .padding(.horizontal, CCSpacing.lg)
-        .padding(.vertical, CCSpacing.sm)
         .background(CCColor.bgPrimary)
     }
 }
@@ -433,25 +430,85 @@ struct CCCodeBlock: View {
     }
 }
 
-/// 状态栏浮层
+/// 状态栏浮层 - MUJI 风格
 struct CCStatusOverlay: View {
     let text: String
 
     var body: some View {
         HStack(spacing: CCSpacing.sm) {
             ProgressView()
-                .scaleEffect(0.8)
+                .scaleEffect(0.7)
                 .tint(CCColor.accentClaude)
 
             Text(text)
                 .font(.ccCaption)
-                .foregroundColor(CCColor.textSecondary)
+                .foregroundColor(CCColor.textTertiary)
         }
         .padding(.horizontal, CCSpacing.lg)
         .padding(.vertical, CCSpacing.sm)
-        .background(.ultraThinMaterial)
+        .background(CCColor.bgSecondary.opacity(0.95))
         .clipShape(Capsule())
-        .shadow(color: .black.opacity(0.1), radius: 4, y: 2)
+    }
+}
+
+// MARK: - Thinking Indicator
+
+/// Claude 思考状态指示器 - 简洁的脉冲点动画
+/// 注意：不显示文字，文字由 CCStatusOverlay 统一显示
+struct CCThinkingIndicator: View {
+    @State private var animationPhase = 0
+
+    var body: some View {
+        HStack(spacing: CCSpacing.sm) {
+            // 左侧指示线
+            Rectangle()
+                .fill(CCColor.accentClaude)
+                .frame(width: 2)
+
+            // 脉冲点动画
+            HStack(spacing: 4) {
+                ForEach(0..<3, id: \.self) { index in
+                    Circle()
+                        .fill(CCColor.accentClaude)
+                        .frame(width: 5, height: 5)
+                        .opacity(animationPhase == index ? 1.0 : 0.3)
+                }
+            }
+
+            Spacer()
+        }
+        .frame(height: 20)
+        .padding(.vertical, CCSpacing.xs)
+        .onAppear {
+            Timer.scheduledTimer(withTimeInterval: 0.35, repeats: true) { _ in
+                withAnimation(.easeInOut(duration: 0.15)) {
+                    animationPhase = (animationPhase + 1) % 3
+                }
+            }
+        }
+    }
+}
+
+/// 脉冲点动画（用于思考状态）
+struct CCPulsingDots: View {
+    @State private var animationPhase = 0
+
+    var body: some View {
+        HStack(spacing: 4) {
+            ForEach(0..<3) { index in
+                Circle()
+                    .fill(CCColor.accentClaude)
+                    .frame(width: 6, height: 6)
+                    .opacity(animationPhase == index ? 1.0 : 0.3)
+            }
+        }
+        .onAppear {
+            Timer.scheduledTimer(withTimeInterval: 0.4, repeats: true) { _ in
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    animationPhase = (animationPhase + 1) % 3
+                }
+            }
+        }
     }
 }
 

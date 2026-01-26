@@ -2,15 +2,15 @@
 //  MessageComponents.swift
 //  cc connect
 //
-//  Design System v2.0 - 消息组件
-//  IDE 风格的消息行布局
+//  Design System v3.0 - MUJI 风格消息组件
+//  极简、留白、克制的视觉语言
 //
 
 import SwiftUI
 
-// MARK: - Message Row (IDE Style)
+// MARK: - Message Row (MUJI Style)
 
-/// IDE 风格的消息行
+/// MUJI 风格的消息行 - 极简设计
 struct CCMessageRow: View {
     let message: CCMessage
 
@@ -36,159 +36,128 @@ struct CCMessageRow: View {
 
 // MARK: - Claude Message Row
 
-/// Claude 消息行
+/// Claude 消息行 - 极简设计，用细线指示器替代图标
 struct CCClaudeMessageRow: View {
     let message: CCMessage
 
     var body: some View {
-        HStack(alignment: .top, spacing: CCSpacing.sm) {
-            // 图标
-            Image(systemName: CCIcon.claude)
-                .font(.system(size: 14))
-                .foregroundColor(CCColor.accentClaude)
-                .frame(width: 24, alignment: .center)
+        HStack(alignment: .top, spacing: CCSpacing.md) {
+            // 左侧指示线（替代图标，更克制）
+            Rectangle()
+                .fill(CCColor.accentClaude)
+                .frame(width: 2)
 
-            // 内容
-            VStack(alignment: .leading, spacing: CCSpacing.xxs) {
-                // 标签
-                Text("Claude")
-                    .font(.ccCaption)
-                    .foregroundColor(CCColor.accentClaude)
-
-                // 消息内容
-                Text(message.content)
-                    .font(.ccBody)
-                    .foregroundColor(CCColor.textPrimary)
-                    .textSelection(.enabled)
-            }
+            // 内容 - 无标签，直接显示文本
+            Text(message.content)
+                .font(.ccBody)
+                .foregroundColor(CCColor.textPrimary)
+                .textSelection(.enabled)
+                .lineSpacing(4)
 
             Spacer(minLength: 0)
         }
-        .padding(.vertical, CCSpacing.xs)
+        .padding(.vertical, CCSpacing.sm)
     }
 }
 
 // MARK: - User Message Row
 
-/// 用户消息行（右对齐）
+/// 用户消息行 - 极简右对齐，无气泡
 struct CCUserMessageRow: View {
     let message: CCMessage
 
     var body: some View {
-        HStack(alignment: .top, spacing: CCSpacing.sm) {
-            Spacer(minLength: 60)
+        HStack(alignment: .top, spacing: CCSpacing.md) {
+            Spacer(minLength: 80)
 
-            // 内容
-            VStack(alignment: .trailing, spacing: CCSpacing.xxs) {
-                Text(message.content)
-                    .font(.ccBody)
-                    .foregroundColor(.white)
-                    .textSelection(.enabled)
-            }
-            .padding(.horizontal, CCSpacing.md)
-            .padding(.vertical, CCSpacing.sm)
-            .background(CCColor.accentPrimary)
-            .clipShape(RoundedRectangle(cornerRadius: CCRadius.md))
+            // 内容 - 无气泡，纯文本
+            Text(message.content)
+                .font(.ccBody)
+                .foregroundColor(CCColor.textSecondary)
+                .textSelection(.enabled)
+                .lineSpacing(4)
 
-            // 图标
-            Image(systemName: CCIcon.userInput)
-                .font(.system(size: 14))
-                .foregroundColor(CCColor.accentPrimary)
-                .frame(width: 24, alignment: .center)
+            // 右侧指示线
+            Rectangle()
+                .fill(CCColor.textTertiary)
+                .frame(width: 2)
         }
-        .padding(.vertical, CCSpacing.xs)
+        .padding(.vertical, CCSpacing.sm)
     }
 }
 
 // MARK: - Tool Call Row
 
-/// 工具调用行
+/// 工具调用行 - 简化版，单行显示
 struct CCToolCallRow: View {
     let message: CCMessage
     @State private var isExpanded = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            // 头部
-            HStack(spacing: CCSpacing.sm) {
-                Image(systemName: CCIcon.toolCall)
-                    .font(.system(size: 14))
-                    .foregroundColor(CCColor.accentInfo)
-                    .frame(width: 24, alignment: .center)
+        VStack(alignment: .leading, spacing: CCSpacing.xs) {
+            // 工具名称 + 参数，单行紧凑显示
+            HStack(spacing: CCSpacing.xs) {
+                Text("→")
+                    .font(.ccCode)
+                    .foregroundColor(CCColor.textTertiary)
 
                 Text(message.toolName ?? "工具")
-                    .font(.ccCodeBold)
-                    .foregroundColor(CCColor.accentInfo)
+                    .font(.ccCode)
+                    .foregroundColor(CCColor.textSecondary)
 
                 if let filePath = message.filePath {
                     Text(filePath)
                         .font(.ccCodeSmall)
-                        .foregroundColor(CCColor.textSecondary)
+                        .foregroundColor(CCColor.textTertiary)
                         .lineLimit(1)
                 }
 
                 Spacer()
-
-                // 复制按钮
-                Button(action: {
-                    UIPasteboard.general.string = message.content
-                    CCHaptic.light()
-                }) {
-                    Image(systemName: CCIcon.copy)
-                        .font(.system(size: 12))
-                        .foregroundColor(CCColor.textTertiary)
-                }
             }
-            .padding(.vertical, CCSpacing.xs)
 
-            // 代码内容（如果有）
-            if !message.content.isEmpty {
-                CCCodeBlock(
-                    code: message.content,
-                    fileName: message.filePath,
-                    maxLines: 6
-                )
-                .padding(.leading, 24 + CCSpacing.sm)
+            // 代码内容（如果有且较长）
+            if !message.content.isEmpty && message.content.count > 50 {
+                Text(message.content)
+                    .font(.ccCodeSmall)
+                    .foregroundColor(CCColor.textTertiary)
+                    .lineLimit(isExpanded ? nil : 2)
+                    .padding(.leading, CCSpacing.lg)
+                    .onTapGesture {
+                        withAnimation(.easeInOut(duration: 0.15)) {
+                            isExpanded.toggle()
+                        }
+                    }
             }
         }
+        .padding(.vertical, CCSpacing.xs)
     }
 }
 
 // MARK: - Tool Result Row
 
-/// 工具结果行
+/// 工具结果行 - 极简，缩进显示
 struct CCToolResultRow: View {
     let message: CCMessage
     @State private var isExpanded = false
 
     var body: some View {
-        HStack(alignment: .top, spacing: CCSpacing.sm) {
-            // 图标
-            Image(systemName: CCIcon.toolResult)
-                .font(.system(size: 14))
-                .foregroundColor(CCColor.accentSuccess)
-                .frame(width: 24, alignment: .center)
+        HStack(alignment: .top, spacing: CCSpacing.xs) {
+            Text("←")
+                .font(.ccCode)
+                .foregroundColor(CCColor.textTertiary)
 
-            // 内容
-            VStack(alignment: .leading, spacing: CCSpacing.xxs) {
-                Text(message.content)
-                    .font(.ccCodeSmall)
-                    .foregroundColor(CCColor.textSecondary)
-                    .lineLimit(isExpanded ? nil : 3)
-                    .textSelection(.enabled)
-
-                if message.content.count > 200 {
-                    Button(action: {
-                        withAnimation(.easeInOut(duration: 0.2)) {
+            Text(message.content)
+                .font(.ccCodeSmall)
+                .foregroundColor(CCColor.textTertiary)
+                .lineLimit(isExpanded ? nil : 2)
+                .textSelection(.enabled)
+                .onTapGesture {
+                    if message.content.count > 100 {
+                        withAnimation(.easeInOut(duration: 0.15)) {
                             isExpanded.toggle()
                         }
-                    }) {
-                        Text(isExpanded ? "收起" : "展开")
-                            .font(.ccCaption)
-                            .foregroundColor(CCColor.accentPrimary)
                     }
                 }
-            }
 
             Spacer(minLength: 0)
         }
@@ -198,42 +167,32 @@ struct CCToolResultRow: View {
 
 // MARK: - Error Row
 
-/// 错误消息行
+/// 错误消息行 - 简约错误提示
 struct CCErrorRow: View {
     let message: CCMessage
 
     var body: some View {
-        HStack(alignment: .top, spacing: CCSpacing.sm) {
-            // 图标
-            Image(systemName: CCIcon.error)
-                .font(.system(size: 14))
+        HStack(alignment: .top, spacing: CCSpacing.md) {
+            // 左侧红色指示线
+            Rectangle()
+                .fill(CCColor.accentDanger)
+                .frame(width: 2)
+
+            // 内容 - 柔和红色文字，无背景
+            Text(message.content)
+                .font(.ccBody)
                 .foregroundColor(CCColor.accentDanger)
-                .frame(width: 24, alignment: .center)
-
-            // 内容
-            VStack(alignment: .leading, spacing: CCSpacing.xxs) {
-                Text("错误")
-                    .font(.ccCaption)
-                    .foregroundColor(CCColor.accentDanger)
-
-                Text(message.content)
-                    .font(.ccBody)
-                    .foregroundColor(CCColor.accentDanger)
-                    .textSelection(.enabled)
-            }
-            .padding(CCSpacing.sm)
-            .background(CCColor.dangerBg)
-            .clipShape(RoundedRectangle(cornerRadius: CCRadius.sm))
+                .textSelection(.enabled)
 
             Spacer(minLength: 0)
         }
-        .padding(.vertical, CCSpacing.xs)
+        .padding(.vertical, CCSpacing.sm)
     }
 }
 
 // MARK: - System Row
 
-/// 系统消息行（居中显示）
+/// 系统消息行 - 极简居中显示
 struct CCSystemRow: View {
     let message: CCMessage
 
@@ -243,38 +202,28 @@ struct CCSystemRow: View {
             Text(message.content)
                 .font(.ccCaption)
                 .foregroundColor(CCColor.textTertiary)
-                .padding(.horizontal, CCSpacing.md)
-                .padding(.vertical, CCSpacing.xs)
-                .background(CCColor.bgTertiary)
-                .clipShape(Capsule())
             Spacer()
         }
-        .padding(.vertical, CCSpacing.xs)
+        .padding(.vertical, CCSpacing.md)
     }
 }
 
 // MARK: - Logo View
 
-/// Claude Code Logo
+/// Claude Code Logo - 简约版
 struct CCLogoView: View {
     var body: some View {
-        HStack(spacing: CCSpacing.sm) {
-            Image(systemName: CCIcon.claude)
-                .font(.title2)
-                .foregroundColor(CCColor.accentClaude)
-
-            Text("Claude Code")
-                .font(.ccHeadline)
-                .foregroundColor(CCColor.accentClaude)
-        }
-        .padding(.vertical, CCSpacing.md)
-        .frame(maxWidth: .infinity)
+        Text("Claude Code")
+            .font(.ccSubheadline)
+            .foregroundColor(CCColor.textTertiary)
+            .padding(.vertical, CCSpacing.lg)
+            .frame(maxWidth: .infinity)
     }
 }
 
 // MARK: - Message List
 
-/// 消息列表视图
+/// 消息列表视图 - 大量留白，呼吸感
 struct CCMessageList: View {
     let messages: [CCMessage]
     var onTap: (() -> Void)? = nil
@@ -282,14 +231,14 @@ struct CCMessageList: View {
     var body: some View {
         ScrollViewReader { proxy in
             ScrollView {
-                LazyVStack(spacing: 0) {
+                LazyVStack(spacing: CCSpacing.sm) {
                     ForEach(messages) { message in
                         CCMessageRow(message: message)
                             .id(message.id)
                     }
                 }
-                .padding(.horizontal, CCSpacing.lg)
-                .padding(.vertical, CCSpacing.md)
+                .padding(.horizontal, CCSpacing.xl)  // 更大的水平边距
+                .padding(.vertical, CCSpacing.lg)
             }
             .background(CCColor.bgPrimary)
             .contentShape(Rectangle())

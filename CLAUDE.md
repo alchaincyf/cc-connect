@@ -38,26 +38,153 @@ npm run tail         # 查看实时日志
 
 ---
 
-## 系统架构
+## 系统架构（v2 - 基于 Hooks）
 
 ```
 ┌─────────────┐                      ┌─────────────┐
 │   iOS App   │  ◄───── 同步 ──────► │   CC CLI    │
 │  (SwiftUI)  │      WebSocket       │  (Node.js)  │
 └─────────────┘                      └──────┬──────┘
-       │                                    │ PTY包装
-       │ APNs                        ┌──────▼──────┐
-       ▼                             │ Claude Code │
-┌─────────────┐                      └─────────────┘
-│ 云端中继服务 │
-│ (CF Workers)│
-└─────────────┘
+       │                                    │
+       │                             ┌──────▼──────┐
+       │ APNs                        │ Hook Server │ ◄── HTTP POST
+       ▼                             │  (19789)    │
+┌─────────────┐                      └──────┬──────┘
+│ 云端中继服务 │                            │
+│ (CF Workers)│                      ┌──────▼──────┐
+└─────────────┘                      │ Claude Code │
+                                     │   Hooks     │
+                                     └─────────────┘
 ```
 
 ### 组件说明
 - **iOS App**：SwiftUI 界面，展示输出、发送输入
-- **CC CLI**：Node.js 工具，PTY 包装 Claude Code，解析输出为结构化消息
+- **CC CLI**：Node.js 工具，启动本地 Hook 服务器，接收 Claude Code 事件
+- **Hook Server**：本地 HTTP 服务器（端口 19789），接收 Claude Code Hooks 事件
 - **云端中继**：Cloudflare Workers + Durable Objects，WebSocket 路由和消息转发
+
+### 核心改进：Hooks 架构
+
+**v2 架构使用 Claude Code 官方的 Hooks API** 替代不可靠的 PTY 输出解析。
+
+**优势**：
+- 结构化 JSON 数据，不需要解析终端输出
+- 准确的状态识别（Stop、Notification 事件）
+- 可靠的权限请求检测（`permission_prompt` matcher）
+- 官方支持，不受终端输出格式变化影响
+
+---
+
+## Claude Code Hooks 集成（重要）
+
+### 架构原理
+
+Claude Code 官方提供 Hooks 系统，在特定事件发生时触发自定义脚本。
+我们利用这个机制获取结构化的状态信息，替代不可靠的 PTY 输出解析。
+
+```
+Claude Code 执行任务
+    ↓ 触发 Hook 事件
+Hook 脚本 (cc-hook-notify)
+    ↓ HTTP POST
+CLI Hook Server (端口 19789)
+    ↓ 处理事件
+WebSocket 发送到手机
+    ↓
+iOS App 显示
+```
+
+### Hook 事件类型
+
+| 事件 | 触发时机 | 用途 |
+|------|----------|------|
+| `Stop` | Claude 完成响应 | 知道何时发送完整消息 |
+| `Notification` | 权限请求、空闲等 | 识别需要用户响应的状态 |
+| `PreToolUse` | 工具调用前 | 获取工具调用信息 |
+| `PostToolUse` | 工具调用后 | 获取工具结果 |
+| `UserPromptSubmit` | 用户提交输入 | 记录用户输入 |
+
+### Notification 子类型
+
+| Matcher | 说明 |
+|---------|------|
+| `permission_prompt` | 权限请求（需要 y/n/a 响应） |
+| `idle_prompt` | 空闲等待输入（60秒无操作） |
+| `elicitation_dialog` | 选择对话（需要数字选择） |
+
+### 安装 Hooks 配置
+
+```bash
+# 安装 CLI
+npm install -g huashu-cc
+
+# 安装 Hooks 配置（推荐）
+huashu-cc install-hooks
+
+# 查看配置内容
+huashu-cc install-hooks --show
+
+# 检查安装状态
+huashu-cc check-hooks
+```
+
+安装后会在 `~/.claude/settings.json` 中添加 hooks 配置。
+
+### Hooks 配置示例
+
+```json
+{
+  "hooks": {
+    "Stop": [{
+      "hooks": [{
+        "type": "command",
+        "command": "cc-hook-notify stop",
+        "timeout": 5
+      }]
+    }],
+    "Notification": [
+      {
+        "matcher": "permission_prompt",
+        "hooks": [{
+          "type": "command",
+          "command": "cc-hook-notify notification permission"
+        }]
+      }
+    ],
+    "PreToolUse": [{
+      "matcher": "*",
+      "hooks": [{
+        "type": "command",
+        "command": "cc-hook-notify pre-tool"
+      }]
+    }]
+  }
+}
+```
+
+### CLI 端文件结构
+
+```
+cc-cli/src/
+├── index.ts       # CLI 入口，命令: start, install-hooks, check-hooks
+├── session.ts     # 会话管理，启动 Hook Server
+├── hooks.ts       # Hook 服务器和事件处理
+├── hook-notify.ts # Hook 脚本（被 Claude Code 调用）
+├── websocket.ts   # WebSocket 客户端
+└── parser.ts      # 备用解析器（Hooks 未配置时使用）
+```
+
+### 数据流
+
+**Hooks 模式（推荐）**：
+```
+Claude Code Hook → cc-hook-notify → HTTP POST → Hook Server → WebSocket → iOS
+```
+
+**备用模式（Hooks 未配置）**：
+```
+PTY 输出 → 简单解析 → WebSocket → iOS
+```
 
 ---
 
@@ -94,13 +221,21 @@ DesignSystem/
 ### CLI 工具 (cc-cli/src/)
 
 ```
-index.ts      # Commander CLI 入口，命令: cc start [-n name] [-s server]
-session.ts    # 会话管理：生成 sessionId/secret，启动 PTY，显示二维码
-parser.ts     # 输出解析器 v2：支持交互类型、颜色保留、开放扩展
-websocket.ts  # WebSocket 客户端，自动重连，心跳
+index.ts       # Commander CLI 入口
+               # 命令: start, install-hooks, check-hooks
+session.ts     # 会话管理：启动 Hook Server + PTY，显示二维码
+hooks.ts       # Hook 服务器（端口 19789）和事件处理
+hook-notify.ts # Hook 脚本，被 Claude Code 调用
+parser.ts      # 备用解析器（Hooks 未配置时使用）
+websocket.ts   # WebSocket 客户端，自动重连，心跳
 ```
 
-**配对码格式**：`cc://<sessionId>:<secret>`
+**CLI 命令**：
+- `huashu-cc start` - 启动会话，显示配对二维码
+- `huashu-cc install-hooks` - 安装 Claude Code Hooks 配置
+- `huashu-cc check-hooks` - 检查 Hooks 配置状态
+
+**配对码格式**：`cc://<sessionId>:<secret>:<name>`
 
 ### 中继服务 (relay-server/src/)
 
@@ -115,16 +250,44 @@ index.ts      # Cloudflare Worker + SessionDO Durable Object
 
 ## 核心数据流
 
+### Hooks 模式（推荐）
+
 ```
-Claude Code 输出
-    ↓ node-pty 捕获
-CLI parser.ts 解析为 CCMessage
-    ↓ WebSocket
+Claude Code 执行
+    ↓ 触发 Hook 事件
+cc-hook-notify 脚本
+    ↓ HTTP POST (JSON)
+CLI hooks.ts 处理
+    ↓ 转换为 ProcessedEvent
+WebSocket 发送
+    ↓
 Cloudflare DO 转发
-    ↓ WebSocket
+    ↓
 iOS WebSocketManager 接收
-    ↓ @Published messages
+    ↓ 更新 claudeState + messages
 SwiftUI View 自动刷新
+```
+
+### 状态同步
+
+```typescript
+// CLI 发送的状态消息
+{
+  type: "status",
+  status: "idle" | "working" | "waiting_permission" | "waiting_input",
+  content: "状态描述"
+}
+
+// CLI 发送的消息
+{
+  type: "message",
+  message: {
+    type: "claude" | "permission_request" | ...,
+    content: "消息内容",
+    options?: [...],  // 交互选项
+    tool?: {...}      // 工具信息
+  }
+}
 ```
 
 **远程输入流程**：App 发送 `{"type":"input","text":"..."}` → 中继转发 → CLI `shell.write()`
@@ -247,54 +410,72 @@ Text(String(localized: "key_name"))
 
 | 项目 | 内容 |
 |------|------|
-| **阶段** | Phase 3 开发 - 设计系统重构完成 |
-| **进度** | 设计系统 v2.0 完成，待编译验证 |
-| **上次决策** | 完整重构交互和视觉设计 |
+| **阶段** | Phase 3 开发 - Hooks 架构稳定 |
+| **进度** | v1.1.1 修复消息重复和状态显示问题 |
+| **上次决策** | 修复备用模式在 Hooks 运行时仍然执行的问题 |
 
-### 最新完成 (2026-01-21)
+### 最新完成 (2026-01-26)
 
-**设计系统 v2.0 重构（核心改进）**
-- ✅ **色彩系统重构** - GitHub Dark 风格，深色优先，自适应亮/暗模式
-- ✅ **字体系统重构** - 界面字体 + 代码字体完整规范
-- ✅ **间距系统** - 4pt 基础网格，语义化命名
-- ✅ **图标系统** - SF Symbols 统一映射
-- ✅ **核心组件** - 按钮、状态指示器、输入栏、代码块
-- ✅ **消息组件** - IDE 风格消息行（非聊天气泡）
-- ✅ **权限请求 Sheet** - 强制弹出，视觉突出
-- ✅ **页面重构** - 会话列表、会话详情、引导页
+**v1.1.1 Bug 修复**
+- ✅ **禁用备用模式** - 当 Hook 服务器运行时，禁用 fallbackStateDetection
+- ✅ **过滤思考状态词汇** - Moseying、Thinking 等不再作为消息显示
+- ✅ **过滤用户输入回显** - iOS 端过滤重复的用户消息（PTY 回显）
+- ✅ **简化思考指示器** - 移除中文文字，只保留脉冲点动画
+- ✅ **状态显示互斥** - CCThinkingIndicator 和 CCStatusOverlay 不再同时显示
 
-**设计亮点**
-- Claude 品牌色：#CA8A04（琥珀金）
-- 权限请求使用 Sheet 强制打断
-- 触觉反馈（Haptic Feedback）全面支持
-- 向后兼容旧组件 API
+**v1.1.0 Hooks 架构升级（重大改进）**
+- ✅ **Hooks 集成** - 使用 Claude Code 官方 Hooks API
+- ✅ **Hook Server** - 本地 HTTP 服务器接收事件（端口 19789）
+- ✅ **Hook 脚本** - `cc-hook-notify` 被 Claude Code 调用
+- ✅ **CLI 命令** - `install-hooks`, `check-hooks` 配置管理
+- ✅ **状态同步** - ClaudeState 四种状态（idle/working/waiting_permission/waiting_input）
+- ✅ **iOS 适配** - WebSocketManager 支持新状态类型
+- ✅ **备用模式** - Hooks 未配置时使用简化的 PTY 解析
 
-**设计文档**
-- 完整规范：`docs/design/00-设计系统规范.md`
+**架构优势**
+- 结构化 JSON 数据，不需要解析终端输出
+- 准确的状态识别（Stop 事件 = Claude 完成响应）
+- 可靠的权限请求检测（Notification + permission_prompt）
+- 官方支持，不受 Claude Code 更新影响
+
+### 之前完成 (2026-01-21)
+
+**设计系统 v2.0 重构**
+- ✅ 色彩系统、字体系统、间距系统、图标系统
+- ✅ 核心组件、消息组件、权限请求 Sheet
+- ✅ 页面重构（会话列表、会话详情、引导页）
 
 ### 待完成
+- [ ] Hooks 配置安装流程测试
+- [ ] Hook 事件端到端测试
+- [ ] iOS 端状态显示验证
 - [ ] Xcode 编译验证
-- [ ] 深色/浅色模式测试
-- [ ] 真机测试体验
-- [ ] 细节打磨和调整
 
 ### 架构要点
 
-**CLI 端消息处理流程**
+**CLI 端 Hooks 模式处理流程**
 ```
-PTY 输出 → rawOutputBuffer 累积
-         → 300ms 稳定窗口（或遇到 ❯ 提示符 50ms）
-         → resetParser() + parseOutput() + flushBuffer()
-         → mergeMessages() 合并连续同类型
-         → 过滤噪音 + 分类（可发送/状态）
-         → 发送 message 或 status 类型到 iOS
+Claude Code Hook 事件
+    ↓ cc-hook-notify 脚本
+HTTP POST → hooks.ts Hook Server
+    ↓ processHookEvent()
+转换为 ProcessedEvent
+    ↓ handleHookEvent()
+WebSocket 发送 status/message
+```
+
+**CLI 端备用模式**
+```
+PTY 输出 → fallbackStateDetection()
+         → 简单的提示符检测
+         → 发送基本消息
 ```
 
 **iOS 端消息处理**
 ```
-收到 message → parseAndAddMessage() → messages.append() + persistMessage()
-收到 status → 只更新 statusBarText
-进入会话 → loadHistoryMessages() 从 SwiftData 加载
+收到 status → 更新 claudeState + statusBarText
+收到 message → parseAndAddMessage() → messages.append()
+交互类型 → 设置 currentInteraction + claudeState
 ```
 
 ---
@@ -368,6 +549,132 @@ mcp__<server>__<tool>  # MCP 工具
 - 工具识别使用通用正则 `(\w+)\(`，自动支持新工具
 - 消息类型可扩展，添加新 case 即可
 - 保留 `raw` 字段用于调试
+
+---
+
+## CLI 状态检测（备用模式）
+
+> **注意**：v1.1.0 开始主要使用 Hooks 架构获取状态。
+> 以下内容是 Hooks 未配置时的备用模式。
+
+### 思考状态检测
+
+Claude Code 使用多种有趣词汇表示思考状态：
+
+```typescript
+const thinkingKeywords = [
+  'Composing', 'Thinking', 'Pondering', 'Processing',
+  'Finagling', 'Schlepping', 'Brewing', 'Levitating',
+  'Analyzing', 'Writing', 'Reading', 'Editing'
+  // ... 更多词汇
+];
+```
+
+### 备用模式处理逻辑
+
+备用模式使用简化的 PTY 解析：
+1. 检测提示符 `❯` → 表示 Claude 完成响应
+2. 检测 `⏺` 开头 → Claude 消息
+3. 检测思考关键词 → 发送状态更新
+
+### 消息分类
+
+| 分类 | 发送类型 | 效果 |
+|------|----------|------|
+| `thinking` 等状态 | `status` | 更新状态栏，不加入消息列表 |
+| `claude`, `tool_call` 等 | `message` | 添加到消息列表 |
+
+---
+
+## iOS 选项响应机制
+
+### 选择对话响应
+
+选择对话的选项需要发送**数字**（1, 2, 3）到终端，不是 opt_id。
+
+```swift
+// WebSocketManager.swift
+func respondToInteraction(option: InteractionOption) {
+    if option.actionType == .select {
+        // 优先使用 hotkey（数字）
+        input = option.hotkey ?? option.id
+    }
+}
+```
+
+**选项结构**：
+- `hotkey` 字段存储数字（"1", "2", "3"）
+- `actionType` 为 `.select` 时使用 hotkey
+- 回车键选择默认选项
+
+---
+
+## MUJI 设计规范
+
+### 色彩系统
+
+| 用途 | 深色模式 | 浅色模式 |
+|------|----------|----------|
+| 背景主色 | #121212 | #FAFAFA |
+| 背景次色 | #1A1A1A | #FFFFFF |
+| 强调色（Claude） | #D4A574 淡木色 | #8B7355 深木色 |
+| 成功色 | #7CAE7A | #5D8A5B |
+
+### 视觉风格
+
+- 用 2px 细线替代图标作为消息类型指示器
+- 大量留白（xxxl: 56pt, xxxxl: 72pt）
+- 去除多余装饰，强调内容本身
+
+---
+
+## npm 发布流程
+
+### Token 配置
+
+Token 存储在两个位置（都已加入 .gitignore）：
+
+1. **项目级 `.env`** - 备份记录
+   ```bash
+   NPM_TOKEN=npm_xxx...
+   ```
+
+2. **cc-cli/.npmrc** - 实际使用
+   ```
+   //registry.npmjs.org/:_authToken=npm_xxx...
+   ```
+
+### 发布命令
+
+```bash
+cd cc-cli
+
+# 方式一：使用项目 .npmrc（推荐）
+# 先确保 .npmrc 文件存在且包含正确 token
+npm publish --access public
+
+# 方式二：一次性创建 .npmrc 并发布
+echo "//registry.npmjs.org/:_authToken=TOKEN_HERE" > .npmrc
+npm publish --access public
+```
+
+### 版本更新流程
+
+```bash
+cd cc-cli
+
+# 1. 修改 package.json 中的 version
+# 2. 编译并发布
+npm run build
+npm publish --access public
+```
+
+### 当前版本
+
+- **包名**: huashu-cc
+- **最新版本**: 1.1.1
+- **安装命令**: `npm install -g huashu-cc@latest`
+- **可执行文件**: `cc`, `huashu-cc`, `cc-hook-notify`
 
 ---
 

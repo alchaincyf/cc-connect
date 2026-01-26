@@ -12,6 +12,7 @@ enum ConnectionState: Equatable {
 }
 
 // MARK: - 消息类型系统 (可扩展设计)
+// 注意: ClaudeState 定义在 Session.swift 中
 
 /// Claude Code 消息类型 - 使用字符串保持开放性
 /// 核心类型有明确定义，未知类型可通过 rawValue 传递
@@ -263,6 +264,8 @@ class WebSocketManager: NSObject, ObservableObject {
     @Published var messages: [CCMessage] = []
     @Published var currentInteraction: CCMessage? = nil  // 当前需要响应的交互（问题/权限/选择）
     @Published var statusBarText: String? = nil          // 状态栏文本（如 Thinking...）
+    @Published var isThinking: Bool = false              // Claude 是否正在思考
+    @Published var claudeState: ClaudeState = .idle      // Claude 工作状态（基于 Hooks）
 
     /// 兼容旧属性名
     var currentQuestion: CCMessage? {
@@ -271,6 +274,10 @@ class WebSocketManager: NSObject, ObservableObject {
     }
 
     private var webSocket: URLSessionWebSocketTask?
+
+    /// 最近发送的用户输入，用于去重
+    private var recentUserInputs: [String] = []
+    private let maxRecentInputs = 10
     private var urlSession: URLSession?
     private var pingTimer: Timer?
     private var reconnectAttempt = 0
@@ -378,6 +385,12 @@ class WebSocketManager: NSObject, ObservableObject {
     func sendInput(_ text: String) {
         print("📤 发送: \(text)")
 
+        // 记录到最近输入列表，用于过滤回显
+        recentUserInputs.append(text)
+        if recentUserInputs.count > maxRecentInputs {
+            recentUserInputs.removeFirst()
+        }
+
         // 添加到本地消息列表并持久化
         let userMessage = CCMessage(type: .userInput, content: text)
         messages.append(userMessage)
@@ -407,7 +420,15 @@ class WebSocketManager: NSObject, ObservableObject {
         // 根据选项类型生成输入
         let input: String
         if let actionType = option.actionType {
-            input = actionType.cliInput.isEmpty ? option.id : actionType.cliInput
+            if actionType == .select {
+                // 选择类型：优先使用 hotkey（数字），其次 id
+                input = option.hotkey ?? option.id
+            } else if actionType.cliInput.isEmpty {
+                // 其他类型 cliInput 为空时用 hotkey 或 id
+                input = option.hotkey ?? option.id
+            } else {
+                input = actionType.cliInput
+            }
         } else if let hotkey = option.hotkey {
             input = hotkey
         } else {
@@ -548,8 +569,28 @@ class WebSocketManager: NSObject, ObservableObject {
             webSocket?.send(.string("{\"type\":\"pong\"}")) { _ in }
 
         case "status":
-            // 状态更新（thinking, status_bar 等）- 只更新状态栏，不添加消息
-            if let content = json["content"] as? String {
+            // 状态更新（基于 Hooks 架构）
+            if let statusType = json["status"] as? String {
+                switch statusType {
+                case "idle":
+                    claudeState = .idle
+                    isThinking = false
+                    session?.isThinking = false
+                case "working", "thinking":
+                    claudeState = .working
+                    isThinking = true
+                    session?.isThinking = true
+                case "waiting_permission":
+                    claudeState = .waitingPermission
+                    isThinking = false
+                case "waiting_input":
+                    claudeState = .waitingInput
+                    isThinking = false
+                default:
+                    break
+                }
+            }
+            if let content = json["content"] as? String, !content.isEmpty {
                 statusBarText = content
                 print("📊 状态: \(content.prefix(50))")
             }
@@ -567,6 +608,28 @@ class WebSocketManager: NSObject, ObservableObject {
 
         // 尝试解析类型，未知类型使用 .raw
         let type = CCMessageType(rawValue: typeStr) ?? .raw
+
+        // 过滤重复的用户输入消息（PTY 回显）
+        if type == .userInput {
+            if recentUserInputs.contains(content) {
+                print("🔄 过滤重复用户输入: \(content.prefix(30))")
+                return
+            }
+        }
+
+        // 过滤思考状态关键词消息（不应该作为消息显示）
+        let thinkingKeywords = ["Moseying", "Thinking", "Pondering", "Processing",
+                                "Composing", "Analyzing", "Writing", "Reading",
+                                "Brewing", "Levitating", "Finagling", "Schlepping"]
+        let contentLower = content.lowercased()
+        let isThinkingMessage = thinkingKeywords.contains { keyword in
+            contentLower.hasPrefix(keyword.lowercased()) &&
+            content.trimmingCharacters(in: .whitespacesAndNewlines).count < 30
+        }
+        if isThinkingMessage && type == .raw {
+            print("🔄 过滤思考状态消息: \(content)")
+            return
+        }
 
         let timestamp = data["timestamp"] as? Int64 ?? Int64(Date().timeIntervalSince1970 * 1000)
         let requiresResponse = data["requiresResponse"] as? Bool
@@ -637,9 +700,11 @@ class WebSocketManager: NSObject, ObservableObject {
             return
         }
 
-        // 思考状态 - 更新状态栏
+        // 思考状态 - 更新状态栏和思考标志
         if type == .thinking {
             statusBarText = thinkingPhase ?? content
+            isThinking = true
+            session?.isThinking = true
             print("💭 思考中: \(thinkingPhase ?? content)")
             return
         }
@@ -664,11 +729,23 @@ class WebSocketManager: NSObject, ObservableObject {
         // 如果是交互类型，设置当前交互
         if type.requiresResponse || requiresResponse == true {
             currentInteraction = message
+            // 更新 Claude 状态
+            if type == .permissionRequest {
+                claudeState = .waitingPermission
+            } else {
+                claudeState = .waitingInput
+            }
             print("🔔 需要用户响应: \(type.rawValue)")
         }
 
-        // 非思考/状态栏消息时，清除状态栏
+        // 非思考/状态栏消息时，清除状态栏和思考标志，更新为空闲状态
         statusBarText = nil
+        isThinking = false
+        session?.isThinking = false
+        // 如果不是交互消息，设置为空闲状态
+        if !type.requiresResponse && requiresResponse != true {
+            claudeState = .idle
+        }
 
         messages.append(message)
         persistMessage(message)
@@ -720,6 +797,16 @@ extension WebSocketManager: URLSessionWebSocketDelegate {
         Task { @MainActor in
             self.connectionState = .connected
             self.reconnectAttempt = 0
+
+            // 发送待处理的启动命令（如果有）
+            if let command = self.session?.pendingStartupCommand {
+                print("🚀 发送启动命令: \(command)")
+                // 延迟一小段时间确保连接稳定
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    self.sendInput(command)
+                    self.session?.pendingStartupCommand = nil
+                }
+            }
         }
     }
 

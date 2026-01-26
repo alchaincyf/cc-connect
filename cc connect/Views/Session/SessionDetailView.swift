@@ -2,8 +2,8 @@
 //  SessionDetailView.swift
 //  cc connect
 //
-//  Design System v2.0 - 会话详情页
-//  IDE 风格的消息展示 + 权限请求 Sheet
+//  Design System v3.0 - MUJI 风格会话详情页
+//  极简消息展示 + 思考状态指示器 + 权限请求 Sheet
 //
 
 import SwiftUI
@@ -15,7 +15,9 @@ struct SessionDetailView: View {
 
     @State private var inputText = ""
     @State private var showPermissionSheet = false
+    @State private var showSelectionSheet = false
     @State private var pendingPermission: CCMessage?
+    @State private var pendingSelection: CCMessage?
 
     @FocusState private var isInputFocused: Bool
 
@@ -31,9 +33,17 @@ struct SessionDetailView: View {
                     onTap: dismissKeyboard
                 )
 
-                // 交互区域（问题/选择对话）
+                // 思考状态指示器 - 仅当思考但没有具体状态文字时显示
+                if wsManager.isThinking && wsManager.statusBarText == nil {
+                    CCThinkingIndicator()
+                        .padding(.horizontal, CCSpacing.xl)
+                        .transition(.opacity.combined(with: .move(edge: .bottom)))
+                }
+
+                // 交互区域（简单问题/确认）- 不包括权限请求和选择对话
                 if let interaction = wsManager.currentInteraction,
-                   interaction.type != .permissionRequest {
+                   interaction.type != .permissionRequest,
+                   interaction.type != .selectionDialog {
                     CCInteractionBar(
                         message: interaction,
                         onSelectOption: { option in
@@ -55,6 +65,7 @@ struct SessionDetailView: View {
                     onInterrupt: { wsManager.sendInterrupt() }
                 )
             }
+            .animation(.easeInOut(duration: 0.2), value: wsManager.isThinking)
 
             // 状态栏浮层
             if let statusText = wsManager.statusBarText {
@@ -71,12 +82,6 @@ struct SessionDetailView: View {
             ToolbarItem(placement: .navigationBarTrailing) {
                 CCConnectionBadge(state: wsManager.connectionState)
             }
-            ToolbarItemGroup(placement: .keyboard) {
-                Spacer()
-                Button("完成") {
-                    dismissKeyboard()
-                }
-            }
         }
         .onAppear {
             connectWebSocket()
@@ -85,10 +90,17 @@ struct SessionDetailView: View {
             wsManager.disconnect()
         }
         .onChange(of: wsManager.currentInteraction) { _, newValue in
+            guard let interaction = newValue else { return }
+
             // 权限请求使用 Sheet 弹出
-            if let interaction = newValue, interaction.type == .permissionRequest {
+            if interaction.type == .permissionRequest {
                 pendingPermission = interaction
                 showPermissionSheet = true
+            }
+            // 选择对话使用 Sheet 弹出
+            else if interaction.type == .selectionDialog {
+                pendingSelection = interaction
+                showSelectionSheet = true
             }
         }
         .sheet(isPresented: $showPermissionSheet) {
@@ -106,6 +118,21 @@ struct SessionDetailView: View {
                     onAlwaysAllow: {
                         wsManager.sendInput("a")
                         pendingPermission = nil
+                    }
+                )
+            }
+        }
+        .sheet(isPresented: $showSelectionSheet) {
+            if let selection = pendingSelection {
+                CCSelectionSheet(
+                    message: selection,
+                    onSelect: { option in
+                        wsManager.respondToInteraction(option: option)
+                        pendingSelection = nil
+                    },
+                    onInput: { text in
+                        wsManager.sendInput(text)
+                        pendingSelection = nil
                     }
                 )
             }

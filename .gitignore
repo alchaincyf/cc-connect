@@ -1,46 +1,28 @@
-# macOS
-.DS_Store
-.AppleDouble
-.LSOverride
-
-# Xcode
-build/
-DerivedData/
-*.xcuserstate
-xcuserdata/
-
-# Swift Package Manager
-.build/
-Packages/
-Package.resolved
-
-# CocoaPods
-Pods/
+# 环境变量和敏感信息
+.env
+.env.local
+.env.*.local
+.npmrc
 
 # Node.js
 node_modules/
 npm-debug.log*
 
-# TypeScript
-*.js.map
+# macOS
+.DS_Store
+*.swp
+*~
 
-# Environment
-.env
-.env.local
+# Xcode
+xcuserdata/
+*.xcscmblueprint
+*.xccheckout
+DerivedData/
+build/
+
+# 编译产物
+cc-cli/dist/
 
 # IDE
-.vscode/
 .idea/
-
-# Logs
-*.log
-
-# Test files
-test.html
-
-# Third-party libraries (use SPM instead)
-SwiftTerm/
-
-# Cloudflare Wrangler
-.wrangler/
-.dev.vars
+.vscode/

@@ -2,8 +2,8 @@
 //  Spacing.swift
 //  cc connect
 //
-//  Design System v2.0 - 间距与布局系统
-//  基于 4pt 基础网格
+//  Design System v3.0 - MUJI 风格间距系统
+//  更大的留白，更多呼吸感
 //
 
 import SwiftUI
@@ -45,34 +45,34 @@ enum CCSpacing {
     /// 48pt - 特大间距
     static let space12: CGFloat = 48
 
-    // MARK: - Semantic Aliases (语义化别名)
+    // MARK: - Semantic Aliases (MUJI 风格 - 更大留白)
 
-    /// 2pt - 超小间距
-    static let xxs: CGFloat = 2
+    /// 4pt - 超小间距
+    static let xxs: CGFloat = 4
 
-    /// 4pt - 极小间距
-    static let xs: CGFloat = space1
+    /// 8pt - 极小间距
+    static let xs: CGFloat = space2
 
-    /// 8pt - 小间距
-    static let sm: CGFloat = space2
+    /// 12pt - 小间距
+    static let sm: CGFloat = space3
 
-    /// 12pt - 中等间距
-    static let md: CGFloat = space3
+    /// 16pt - 中等间距
+    static let md: CGFloat = space4
 
-    /// 16pt - 大间距
-    static let lg: CGFloat = space4
+    /// 24pt - 大间距（增加留白）
+    static let lg: CGFloat = space6
 
-    /// 24pt - 超大间距
-    static let xl: CGFloat = space6
+    /// 32pt - 超大间距
+    static let xl: CGFloat = space8
 
-    /// 32pt - 巨大间距
-    static let xxl: CGFloat = space8
+    /// 40pt - 巨大间距
+    static let xxl: CGFloat = space10
 
-    /// 40pt - 极大间距
-    static let xxxl: CGFloat = space10
+    /// 56pt - 极大间距（大幅增加）
+    static let xxxl: CGFloat = 56
 
-    /// 48pt - 最大间距
-    static let xxxxl: CGFloat = space12
+    /// 72pt - 最大间距（大幅增加）
+    static let xxxxl: CGFloat = 72
 
     // MARK: - Component Specific (组件专用)
 

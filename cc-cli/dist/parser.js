@@ -47,12 +47,12 @@ const PATTERNS = {
     permissionRequest: /^(\?|⚠️|🔐|Allow|Deny|Permission)/i,
     // 选择对话模式
     selectionDialog: /^\s*\[(\d+)\]|\s*\(([a-z])\)/i,
-    // 确认模式
-    confirmation: /\(y\/n\)|\[Y\/n\]|\[yes\/no\]|Continue\?|Proceed\?/i,
+    // 确认模式 - 包含选择对话的问题
+    confirmation: /\(y\/n\)|\[Y\/n\]|\[yes\/no\]|Continue\?|Proceed\?|Do you want to proceed\?/i,
     // 选项列表模式
     optionList: /^\s*[-•]\s+(.+)$/,
-    // 编号选项
-    numberedOption: /^\s*(\d+)[.)]\s+(.+)$/,
+    // 编号选项 - 支持 "> 1. Yes" 和 "  1. Yes" 格式
+    numberedOption: /^\s*[>❯]?\s*(\d+)[.)]\s+(.+)$/,
     // 错误标记
     errorMark: /Error|错误|failed|失败|exception|crash/i,
     // 问题模式
@@ -78,6 +78,7 @@ let outputBuffer = '';
 let lastMessageType = 'system';
 let pendingOptions = [];
 let isCollectingOptions = false;
+let pendingDialogQuestion = '';
 // ============================================================================
 // 颜色处理
 // ============================================================================
@@ -277,6 +278,37 @@ function parseLine(line) {
     // 过滤掉残留的颜色代码
     if (/^[0-9;]+m/.test(trimmed))
         return null;
+    // 过滤思考动画的逐字符更新残留
+    // 这些是 Claude Code 思考动画（如 "Thinking...", "Pondering..."）被逐字符输出时产生的碎片
+    const thinkingFragments = [
+        // Thinking 的碎片
+        'ati', 'ting', 'nking', 'hinking', 'Thinking', 'inking',
+        // Pondering 的碎片
+        'iat', 'giat', 'ering', 'dering', 'ndering', 'ondering', 'Pondering',
+        // 其他思考词的碎片
+        'essing', 'cessing', 'ocessing', 'rocessing', 'Processing',
+        'ewing', 'rewing', 'Brewing',
+        'ting', 'ating', 'itating', 'vitating', 'evitating', 'Levitating',
+        'posing', 'mposing', 'omposing', 'Composing',
+        'gling', 'agling', 'nagling', 'inagling', 'Finagling',
+        'pping', 'epping', 'lepping', 'hlepping', 'chlepping', 'Schlepping',
+    ];
+    // 检查是否是单独的思考碎片（不以特殊符号开头）
+    if (!(/^[⏺●❯└│├]/.test(trimmed))) {
+        const lowerTrimmed = trimmed.toLowerCase();
+        for (const frag of thinkingFragments) {
+            if (lowerTrimmed === frag.toLowerCase() ||
+                lowerTrimmed === frag.toLowerCase() + '...' ||
+                lowerTrimmed === frag.toLowerCase() + '…') {
+                return null;
+            }
+        }
+    }
+    // 过滤带时间的状态碎片（如 "ought for 3s)", "for 3s)"）
+    if (/^(ought\s+)?for\s+\d+s\)?$/i.test(trimmed))
+        return null;
+    if (/^\d+s\)?$/.test(trimmed))
+        return null;
     const timestamp = Date.now();
     const baseMessage = {
         timestamp,
@@ -300,6 +332,14 @@ function parseLine(line) {
         const content = trimmed.replace(/^[⏺●]\s*/, '').trim();
         if (!content || content.length < 2)
             return null;
+        // 过滤 Claude Code 的系统提示消息
+        if (/^Welcome\s+to\s+Claude\s+Code/i.test(content))
+            return null;
+        // 过滤默认AI助手欢迎消息
+        if (/你好.*我是你的AI助手.*有什么可以帮助你的/i.test(content))
+            return null;
+        if (/Hello.*I'm\s+Claude.*How\s+can\s+I\s+(help|assist)/i.test(content))
+            return null;
         // 只有明确的确认对话 (y/n) 才标记为需要回复
         // 普通问号结尾的句子不是需要回复的问题
         if (PATTERNS.confirmation.test(content)) {
@@ -315,15 +355,28 @@ function parseLine(line) {
         lastMessageType = 'claude';
         return { ...baseMessage, type: 'claude', content };
     }
-    // 4. 思考状态 - 只匹配明确的思考行（带动画符号 + 关键词）
-    const thinkingKeywords = /^[✻✽✶✳✢·•]\s*(Composing|Thinking|Pondering|Processing|Finagling|Schlepping|Brewing|Levitating)/i;
+    // 4. 思考状态 - 匹配所有 Claude Code 的思考动画关键词
+    // Claude Code 使用各种有趣的词汇表示思考中
+    const thinkingKeywords = /^[✻✽✶✳✢·•]?\s*(Composing|Thinking|Pondering|Processing|Finagling|Schlepping|Brewing|Levitating|Shenaniganing|Boogieing|Crunching|Musing|Ruminating|Cogitating|Contemplating|Deliberating|Meditating|Reflecting|Percolating|Digesting|Analyzing|Computing|Calculating|Evaluating|Considering|Mulling|Weighing)/i;
     if (thinkingKeywords.test(trimmed)) {
-        const phase = trimmed.match(/(Composing|Thinking|Pondering|Processing|Finagling|Schlepping|Brewing|Levitating)/i)?.[1] || 'Thinking';
+        // 提取思考阶段名称
+        const match = trimmed.match(/(Composing|Thinking|Pondering|Processing|Finagling|Schlepping|Brewing|Levitating|Shenaniganing|Boogieing|Crunching|Musing|Ruminating|Cogitating|Contemplating|Deliberating|Meditating|Reflecting|Percolating|Digesting|Analyzing|Computing|Calculating|Evaluating|Considering|Mulling|Weighing)/i);
+        const phase = match ? match[1] : 'Thinking';
         return {
             ...baseMessage,
             type: 'thinking',
-            content: trimmed,
+            content: phase + '...',
             thinkingPhase: phase,
+        };
+    }
+    // 4.1 过滤带时间/token 统计的状态行（如 "· Crunched for 54s"）
+    if (/^[·•✻✽✶✳✢]?\s*\w+ed?\s+(for\s+\d+s|·|\d+\s*tokens)/i.test(trimmed)) {
+        const match = trimmed.match(/(\w+)(?:ed|ing)/i);
+        return {
+            ...baseMessage,
+            type: 'thinking',
+            content: (match ? match[1] : 'Working') + '...',
+            thinkingPhase: match ? match[1] : 'Working',
         };
     }
     // 5. 忽略不完整状态和动画符号
@@ -340,11 +393,48 @@ function parseLine(line) {
     // 6. 过滤系统提示（Tip 消息）
     if (/^⎿\s*Tip:/i.test(trimmed))
         return null;
-    // 过滤 IDE 状态消息
-    if (/^◯\s*(IDE|\/ide)/i.test(trimmed))
+    // 过滤 IDE 状态消息和系统提示
+    if (/^[◯○]\s*(IDE|VSCode|MCP|\/ide)/i.test(trimmed))
         return null;
-    // 7. 权限请求检测
-    if (PATTERNS.permissionRequest.test(trimmed)) {
+    // 过滤欢迎消息
+    if (/^[✻✽✶✳]\s*Welcome\s+to\s+Claude\s+Code/i.test(trimmed))
+        return null;
+    if (/^\/help\s+for\s+help/i.test(trimmed))
+        return null;
+    if (/^\/status\s+for\s+your\s+current\s+setup/i.test(trimmed))
+        return null;
+    // 过滤工作目录提示
+    if (/^cwd:\s*\//i.test(trimmed))
+        return null;
+    // 6.1 过滤帮助提示和系统消息
+    // 这些不是权限请求，只是 Claude Code 的界面提示
+    // 匹配多种格式：`? for shortcuts`, `? shortcuts`, `?for shortcuts` 等
+    if (/^\??\s*(for\s+)?(shortcuts|help|commands)/i.test(trimmed))
+        return null;
+    // 过滤单独的 `?` 符号或 `? ` 后跟提示
+    if (/^\?\s*$/.test(trimmed))
+        return null;
+    // 过滤 IDE 连接状态提示（出现在底部状态栏）
+    if (/^[◯○]\s*(IDE|VSCode|MCP)\s*(connected|disconnected|connecting)/i.test(trimmed))
+        return null;
+    // 过滤自动更新失败提示
+    if (/^[✗×]\s*Auto-update\s+failed/i.test(trimmed))
+        return null;
+    if (/Try\s+(claude\s+doctor|npm\s+i\s+-g)/i.test(trimmed))
+        return null;
+    // 7. 权限请求检测 - 必须是真正的权限请求
+    // 真正的权限请求格式：
+    // - "? Allow Claude to read files"
+    // - "Allow Bash to run command?"
+    // - "Permission denied" 等
+    // 注意排除系统状态提示
+    const isRealPermissionRequest = (/^(\?\s*)?(Allow|Deny|Permission)/i.test(trimmed) ||
+        /^⚠️/.test(trimmed) ||
+        /^🔐/.test(trimmed) ||
+        /Allow.*\?$/i.test(trimmed)) &&
+        // 排除系统状态栏消息
+        !/for\s+(shortcuts|help)|IDE\s*(dis)?connected|Auto-update/i.test(trimmed);
+    if (isRealPermissionRequest) {
         const options = extractOptions(trimmed);
         return {
             ...baseMessage,
@@ -361,31 +451,102 @@ function parseLine(line) {
             },
         };
     }
-    // 6. 编号选项检测（选择对话）
-    const numberedMatch = trimmed.match(PATTERNS.numberedOption);
-    if (numberedMatch || PATTERNS.selectionDialog.test(trimmed)) {
-        isCollectingOptions = true;
-        pendingOptions.push({
-            id: `opt_${pendingOptions.length}`,
-            label: numberedMatch ? numberedMatch[2] : trimmed,
-            hotkey: numberedMatch ? numberedMatch[1] : undefined,
-            actionType: 'select',
-        });
-        // 暂不返回，等待收集完所有选项
+    // 6. AskUserQuestion 导航栏检测（如 "← □ 发布平台 □切入角度 ✓Submit→"）
+    // 这是 Claude Code 的多步问答导航，过滤掉
+    if (/^[←→]?\s*[□■✓✗]/.test(trimmed) || /Submit[→]?$/i.test(trimmed)) {
         return null;
     }
-    // 7. 如果正在收集选项，遇到非选项行则结束收集
+    // 6.1 选择对话问题检测
+    // 格式：中文问题以 ? 结尾，或英文问题
+    const isSelectionQuestion = /Do you want to (proceed|continue)\?/i.test(trimmed) ||
+        /Choose an option/i.test(trimmed) ||
+        /Select.*:/i.test(trimmed) ||
+        // 中文问题：以 ？ 结尾，且内容有意义
+        (/[？?]$/.test(trimmed) && /[\u4e00-\u9fa5]/.test(trimmed) && trimmed.length > 5);
+    if (isSelectionQuestion && !isCollectingOptions) {
+        isCollectingOptions = true;
+        pendingDialogQuestion = trimmed;
+        return null;
+    }
+    // 6.2 编号选项检测（选择对话的选项）
+    // 格式："> 1. 公众号/博客" 或 "  2. 小红书/微博" 或 "  5. Type something."
+    const numberedMatch = trimmed.match(PATTERNS.numberedOption);
+    if (numberedMatch) {
+        isCollectingOptions = true;
+        const optionNumber = numberedMatch[1];
+        const optionLabel = numberedMatch[2].trim();
+        const isSelected = /^[>❯]/.test(trimmed);
+        pendingOptions.push({
+            id: `opt_${optionNumber}`,
+            label: optionLabel,
+            hotkey: optionNumber,
+            actionType: 'select',
+            isDefault: isSelected,
+        });
+        return null;
+    }
+    // 6.3 选项描述行检测（纯缩进的描述文本）
+    // 如果正在收集选项，且当前行是纯缩进文本（可能是选项描述）
     if (isCollectingOptions && pendingOptions.length > 0) {
-        const options = [...pendingOptions];
-        pendingOptions = [];
-        isCollectingOptions = false;
-        return {
-            ...baseMessage,
-            type: 'selection_dialog',
-            content: '请选择',
-            requiresResponse: true,
-            options,
-        };
+        // 检查是否是描述行：前面有缩进，且不是选项格式
+        if (/^\s{2,}[\u4e00-\u9fa5a-zA-Z]/.test(line) && !numberedMatch) {
+            // 将描述追加到最后一个选项
+            const lastOption = pendingOptions[pendingOptions.length - 1];
+            if (lastOption) {
+                const desc = trimmed;
+                lastOption.description = lastOption.description
+                    ? `${lastOption.description} ${desc}`
+                    : desc;
+            }
+            return null;
+        }
+    }
+    // 6.4 选项收集结束标志
+    // "Enter to select · Tab/Arrow keys to navigate · Esc to cancel"
+    if (/Enter to select|Esc to cancel|Tab.*navigate/i.test(trimmed)) {
+        if (isCollectingOptions && pendingOptions.length > 0) {
+            const options = [...pendingOptions];
+            const question = pendingDialogQuestion || '请选择';
+            pendingOptions = [];
+            pendingDialogQuestion = '';
+            isCollectingOptions = false;
+            return {
+                ...baseMessage,
+                type: 'selection_dialog',
+                content: question,
+                requiresResponse: true,
+                options,
+            };
+        }
+        // 如果没有收集到选项，过滤掉这行提示
+        return null;
+    }
+    // 6.5 如果正在收集选项，遇到非选项/非描述行，可能需要结束
+    if (isCollectingOptions && pendingOptions.length > 0) {
+        // 检查是否还可能有更多选项（空行继续等待）
+        if (/^\s*$/.test(trimmed)) {
+            return null;
+        }
+        // 遇到其他内容，但不立即结束，等待 "Enter to select" 标志
+    }
+    // 保持原有逻辑用于旧格式兼容
+    // 6.6 旧格式：如果正在收集但遇到明确的非选项内容
+    if (isCollectingOptions && pendingOptions.length > 0 && !numberedMatch) {
+        // 如果是明显的其他类型消息，结束收集
+        if (/^[⏺●❯└│├]/.test(trimmed)) {
+            const options = [...pendingOptions];
+            const question = pendingDialogQuestion || '请选择';
+            pendingOptions = [];
+            pendingDialogQuestion = '';
+            isCollectingOptions = false;
+            return {
+                ...baseMessage,
+                type: 'selection_dialog',
+                content: question,
+                requiresResponse: true,
+                options,
+            };
+        }
     }
     // 8. 工具调用
     const toolMatch = trimmed.match(PATTERNS.toolCall);
@@ -449,6 +610,12 @@ function parseLine(line) {
     // 只发送有意义的内容（至少 10 个字符，或包含中文）
     const hasChinese = /[\u4e00-\u9fa5]/.test(trimmed);
     const hasEnglishWords = /[a-zA-Z]{3,}/.test(trimmed);
+    // 额外过滤：底部状态栏的系统消息
+    if (/IDE\s*(dis)?connected|Auto-update\s+failed/i.test(trimmed))
+        return null;
+    // 过滤带时间戳或分隔符的系统消息
+    if (/^\d{4}-\d{2}-\d{2}|^[-=]{3,}|^[╭╰─]+$/i.test(trimmed))
+        return null;
     if (trimmed.length >= 10 || hasChinese || hasEnglishWords) {
         // 额外过滤：如果主要是特殊字符和数字，跳过
         const alphanumericRatio = (trimmed.match(/[a-zA-Z0-9\u4e00-\u9fa5]/g) || []).length / trimmed.length;
@@ -540,27 +707,33 @@ function parseOutput(rawData) {
  * 刷新缓冲区
  */
 function flushBuffer() {
+    const results = [];
     // 如果有待处理的选项，先输出
     if (pendingOptions.length > 0) {
         const options = [...pendingOptions];
+        const question = pendingDialogQuestion || '请选择';
         pendingOptions = [];
+        pendingDialogQuestion = '';
         isCollectingOptions = false;
-        return [{
-                type: 'selection_dialog',
-                content: '请选择',
-                timestamp: Date.now(),
-                requiresResponse: true,
-                options,
-            }];
+        results.push({
+            type: 'selection_dialog',
+            content: question,
+            timestamp: Date.now(),
+            requiresResponse: true,
+            options,
+        });
     }
-    if (!outputBuffer.trim()) {
+    if (outputBuffer.trim()) {
+        const cleanLine = removeDecorations(outputBuffer);
         outputBuffer = '';
-        return [];
+        const parsed = parseLine(cleanLine);
+        if (parsed)
+            results.push(parsed);
     }
-    const cleanLine = removeDecorations(outputBuffer);
-    outputBuffer = '';
-    const parsed = parseLine(cleanLine);
-    return parsed ? [parsed] : [];
+    else {
+        outputBuffer = '';
+    }
+    return results;
 }
 /**
  * 重置解析器状态
@@ -570,6 +743,7 @@ function resetParser() {
     lastMessageType = 'system';
     pendingOptions = [];
     isCollectingOptions = false;
+    pendingDialogQuestion = '';
 }
 /**
  * 格式化用户响应为 Claude Code 可接受的输入

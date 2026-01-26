@@ -52,6 +52,27 @@ enum LiveConnectionState: Equatable {
     case failed(String)
 }
 
+// MARK: - Claude Code 工作状态（基于 Hooks 架构）
+enum ClaudeState: Equatable {
+    case idle               // 等待用户输入
+    case working            // 正在工作/思考
+    case waitingPermission  // 等待权限确认
+    case waitingInput       // 等待用户选择/输入
+
+    var displayText: String {
+        switch self {
+        case .idle: return "等待输入"
+        case .working: return "处理中..."
+        case .waitingPermission: return "需要确认权限"
+        case .waitingInput: return "等待响应"
+        }
+    }
+
+    var isActive: Bool {
+        self == .working
+    }
+}
+
 // MARK: - Session Model
 @Model
 final class Session {
@@ -68,6 +89,15 @@ final class Session {
 
     /// 运行时连接状态（不持久化）
     @Transient var liveConnectionState: LiveConnectionState = .disconnected
+
+    /// 待发送的启动命令（扫码后设置，连接后发送）
+    @Transient var pendingStartupCommand: String?
+
+    /// Claude 是否正在思考（不持久化）
+    @Transient var isThinking: Bool = false
+
+    /// Claude 工作状态（基于 Hooks，不持久化）
+    @Transient var claudeState: ClaudeState = .idle
 
     /// 是否活跃连接
     var isActive: Bool {
@@ -126,19 +156,38 @@ final class Message {
 struct PairingInfo: Codable {
     let sessionId: String
     let secret: String
+    let sessionName: String?  // 会话名称（可选，从工作目录提取）
 
     var qrCodeData: String {
-        "cc://\(sessionId):\(secret)"
+        if let name = sessionName {
+            let encoded = name.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? name
+            return "cc://\(sessionId):\(secret):\(encoded)"
+        }
+        return "cc://\(sessionId):\(secret)"
     }
 
+    /// 解析配对码
+    /// 格式: cc://sessionId:secret 或 cc://sessionId:secret:name
     static func parse(from qrCode: String) -> PairingInfo? {
         guard qrCode.hasPrefix("cc://") else { return nil }
         let data = String(qrCode.dropFirst(5))
-        let parts = data.split(separator: ":")
-        guard parts.count == 2 else { return nil }
+        let parts = data.split(separator: ":", maxSplits: 2, omittingEmptySubsequences: false)
+        guard parts.count >= 2 else { return nil }
+
+        let sessionId = String(parts[0])
+        let secret = String(parts[1])
+
+        // 解析可选的会话名称
+        var sessionName: String? = nil
+        if parts.count >= 3 {
+            let encodedName = String(parts[2])
+            sessionName = encodedName.removingPercentEncoding ?? encodedName
+        }
+
         return PairingInfo(
-            sessionId: String(parts[0]),
-            secret: String(parts[1])
+            sessionId: sessionId,
+            secret: secret,
+            sessionName: sessionName
         )
     }
 }

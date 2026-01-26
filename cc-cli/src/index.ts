@@ -2,6 +2,7 @@
 
 import { Command } from 'commander';
 import { startSession } from './session';
+import { installHooksConfig, checkHooksInstalled, generateHooksConfig } from './hooks';
 import { version } from '../package.json';
 
 const program = new Command();
@@ -22,6 +23,48 @@ program
     } catch (error) {
       console.error('启动失败:', error);
       process.exit(1);
+    }
+  });
+
+program
+  .command('install-hooks')
+  .description('安装 Claude Code Hooks 配置（推荐）')
+  .option('--show', '仅显示配置，不安装')
+  .action(async (options) => {
+    try {
+      if (options.show) {
+        console.log('\nClaude Code Hooks 配置:\n');
+        console.log(JSON.stringify(generateHooksConfig(), null, 2));
+        return;
+      }
+
+      const isInstalled = checkHooksInstalled();
+      if (isInstalled) {
+        console.log('\nHooks 配置已存在。');
+        console.log('如需重新安装，请先手动编辑 ~/.claude/settings.json 移除 hooks 配置。\n');
+        return;
+      }
+
+      await installHooksConfig();
+      console.log('\n✓ Hooks 配置安装成功！');
+      console.log('\n现在可以运行 `cc start` 启动会话。');
+      console.log('Claude Code 的事件将自动同步到手机端。\n');
+    } catch (error) {
+      console.error('安装失败:', error);
+      process.exit(1);
+    }
+  });
+
+program
+  .command('check-hooks')
+  .description('检查 Hooks 配置状态')
+  .action(() => {
+    const isInstalled = checkHooksInstalled();
+    if (isInstalled) {
+      console.log('\n✓ Claude Code Hooks 已配置\n');
+    } else {
+      console.log('\n✗ Claude Code Hooks 未配置');
+      console.log('运行 `cc install-hooks` 安装配置\n');
     }
   });
 

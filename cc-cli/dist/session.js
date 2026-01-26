@@ -1,4 +1,12 @@
 "use strict";
+/**
+ * 会话管理模块
+ *
+ * 新架构：基于 Claude Code Hooks 获取状态
+ * - Hook 事件提供结构化的状态信息
+ * - PTY 输出仅用于终端显示
+ * - 更准确的权限请求和完成状态检测
+ */
 var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
     if (k2 === undefined) k2 = k;
     var desc = Object.getOwnPropertyDescriptor(m, k);
@@ -41,30 +49,36 @@ const pty = __importStar(require("node-pty"));
 const nanoid_1 = require("nanoid");
 const qrcode_terminal_1 = __importDefault(require("qrcode-terminal"));
 const websocket_1 = require("./websocket");
-const parser_1 = require("./parser");
+const hooks_1 = require("./hooks");
+const path = __importStar(require("path"));
+// Hook 服务器是否成功运行（用于决定是否启用备用模式）
+let hookServerRunning = false;
+// 获取当前工作目录名作为默认会话名称
+function getDefaultSessionName() {
+    const cwd = process.cwd();
+    const dirName = path.basename(cwd);
+    if (!dirName || dirName === '/' || dirName === process.env.USER) {
+        return 'Terminal';
+    }
+    return dirName;
+}
 const state = {
     id: (0, nanoid_1.nanoid)(16),
     secret: (0, nanoid_1.nanoid)(32),
-    name: '新会话',
+    name: getDefaultSessionName(),
     shell: null,
     wsClient: null,
 };
 // ============================================================================
-// 输出缓冲系统 - 解决流式输出拆分问题
-// ============================================================================
-// 原始输出缓冲
-let rawOutputBuffer = '';
-let flushTimer = null;
-const FLUSH_DELAY = 300; // 等待 300ms 输出稳定后再处理
 // 消息去重
+// ============================================================================
 const recentMessages = new Set();
-const MAX_RECENT_MESSAGES = 30;
-function getMessageKey(msg) {
-    // 只用内容的前 100 字符做去重
-    return `${msg.type}:${msg.content.substring(0, 100)}`;
+const MAX_RECENT_MESSAGES = 50;
+function getMessageKey(content, type) {
+    return `${type}:${content.substring(0, 100)}`;
 }
-function isDuplicateMessage(msg) {
-    const key = getMessageKey(msg);
+function isDuplicate(content, type) {
+    const key = getMessageKey(content, type);
     if (recentMessages.has(key)) {
         return true;
     }
@@ -76,49 +90,65 @@ function isDuplicateMessage(msg) {
     }
     return false;
 }
+// ============================================================================
+// 会话启动
+// ============================================================================
 async function startSession(options) {
     state.name = options.name;
-    console.log('\n🚀 CC Connect - 远程终端控制\n');
-    console.log('━'.repeat(50));
-    // 1. 先启动 PTY shell
-    console.log('\n📟 正在启动终端 (PTY)...');
+    // 检查 Hooks 是否已配置
+    const hooksInstalled = (0, hooks_1.checkHooksInstalled)();
+    if (!hooksInstalled) {
+        console.log('\n[提示] Claude Code Hooks 未配置。');
+        console.log('运行以下命令安装 Hooks 配置以获得最佳体验:');
+        console.log('  huashu-cc install-hooks\n');
+    }
+    // 1. 启动 Hook 服务器
+    try {
+        await (0, hooks_1.startHookServer)(handleHookEvent);
+        hookServerRunning = true;
+        console.log(`[Hook 服务器] 已启动，端口 ${hooks_1.HOOK_SERVER_PORT}`);
+    }
+    catch (err) {
+        hookServerRunning = false;
+        console.warn('[Hook 服务器] 启动失败，将使用备用模式:', err.message);
+    }
+    // 2. 启动 PTY shell
     try {
         startShell();
-        console.log('✅ 终端已就绪\n');
     }
     catch (error) {
-        console.error('❌ 终端启动失败:', error.message);
+        console.error('终端启动失败:', error.message);
+        (0, hooks_1.stopHookServer)();
         return;
     }
-    // 2. 连接到中继服务器
-    console.log('📡 正在连接到中继服务器...');
+    // 3. 连接到中继服务器
     try {
         state.wsClient = new websocket_1.WebSocketClient(options.server, state.id, state.secret);
         await state.wsClient.connect();
-        console.log('✅ 服务器连接成功\n');
     }
     catch (error) {
-        console.log('⚠️  无法连接到中继服务器\n');
-        console.error(error);
+        console.error('无法连接到中继服务器');
+        (0, hooks_1.stopHookServer)();
         return;
     }
-    // 3. 显示配对二维码
+    // 4. 显示配对二维码
     displayQRCode();
-    // 4. 设置消息处理
+    // 5. 设置消息处理
     state.wsClient.onMessage((msg) => {
         handleRemoteMessage(msg);
     });
     state.wsClient.onDisconnect(() => {
-        console.log('\n⚠️  与服务器的连接已断开');
+        // 静默处理断开
     });
-    console.log('\n⏳ 请用手机扫描二维码连接...\n');
     // 处理退出
     process.on('SIGINT', cleanup);
     process.on('SIGTERM', cleanup);
 }
+// ============================================================================
+// PTY Shell - 仅用于终端显示和输入
+// ============================================================================
 function startShell() {
     const shell = process.env.SHELL || '/bin/zsh';
-    // 使用 node-pty 创建真正的 PTY
     state.shell = pty.spawn(shell, [], {
         name: 'xterm-256color',
         cols: process.stdout.columns || 80,
@@ -126,10 +156,11 @@ function startShell() {
         cwd: process.cwd(),
         env: process.env,
     });
-    // Shell 输出 -> 本地显示 + 发送到手机
+    // Shell 输出 -> 本地终端显示（不再用于解析）
     state.shell.onData((data) => {
         process.stdout.write(data);
-        sendOutput(data);
+        // 备用模式：如果 Hook 服务器未启动，使用简单的状态检测
+        fallbackStateDetection(data);
     });
     // 本地键盘输入 -> Shell
     if (process.stdin.isTTY) {
@@ -144,32 +175,136 @@ function startShell() {
         state.shell?.resize(process.stdout.columns || 80, process.stdout.rows || 24);
     });
     // Shell 退出
-    state.shell.onExit(({ exitCode }) => {
-        console.log(`\n终端已退出 (code: ${exitCode})`);
+    state.shell.onExit(() => {
         cleanup();
     });
 }
-function displayQRCode() {
-    const pairingCode = `cc://${state.id}:${state.secret}`;
-    console.log('📱 扫描下方二维码连接手机 App:\n');
-    qrcode_terminal_1.default.generate(pairingCode, { small: true }, (code) => {
-        console.log(code);
-    });
-    console.log(`\n💡 或手动输入配对码: ${pairingCode}\n`);
-    console.log('━'.repeat(50));
+// ============================================================================
+// 备用状态检测 - 仅当 Hooks 未运行时使用
+// ============================================================================
+let outputBuffer = '';
+let bufferTimer = null;
+// 最近发送的用户输入，用于过滤 PTY 回显
+const recentUserInputs = new Set();
+const MAX_RECENT_INPUTS = 10;
+// 思考状态关键词（这些不应该作为消息发送）
+const THINKING_KEYWORDS = [
+    'Composing', 'Thinking', 'Pondering', 'Processing',
+    'Finagling', 'Schlepping', 'Brewing', 'Levitating',
+    'Analyzing', 'Writing', 'Reading', 'Editing',
+    'Moseying', 'Percolating', 'Ruminating', 'Cogitating',
+    'Noodling', 'Contemplating', 'Deliberating', 'Mulling'
+];
+function fallbackStateDetection(data) {
+    // 如果 Hook 服务器已运行，不使用备用模式
+    if (hookServerRunning)
+        return;
+    if (!state.wsClient?.isConnected)
+        return;
+    // 累积输出
+    outputBuffer += data;
+    // 重置定时器
+    if (bufferTimer) {
+        clearTimeout(bufferTimer);
+    }
+    // 简单的提示符检测
+    const hasPrompt = /❯\s*$/.test(outputBuffer);
+    if (hasPrompt) {
+        bufferTimer = setTimeout(() => {
+            processFallbackOutput();
+        }, 100);
+    }
+    else {
+        bufferTimer = setTimeout(() => {
+            processFallbackOutput();
+        }, 500);
+    }
 }
+function processFallbackOutput() {
+    if (!outputBuffer)
+        return;
+    const buffer = outputBuffer;
+    outputBuffer = '';
+    bufferTimer = null;
+    const cleaned = stripAnsiCodes(buffer);
+    // 过滤掉只包含思考状态关键词的输出
+    const isThinkingOnly = THINKING_KEYWORDS.some(keyword => {
+        const regex = new RegExp(`^[\\s\\*\\+]*${keyword}\\.{0,3}\\s*$`, 'i');
+        return regex.test(cleaned.trim());
+    });
+    if (isThinkingOnly) {
+        // 只发送状态更新，不发送消息
+        return;
+    }
+    // 检测 Claude 消息（⏺ 开头）
+    const claudeMatch = cleaned.match(/⏺\s+(.+?)(?=\n❯|\n⏺|$)/s);
+    if (claudeMatch) {
+        const content = claudeMatch[1].trim();
+        if (content.length > 20 && !isDuplicate(content, 'claude')) {
+            // 过滤工具调用
+            if (!/^\w+\(/.test(content)) {
+                // 过滤思考状态词汇
+                const startsWithThinking = THINKING_KEYWORDS.some(keyword => content.toLowerCase().startsWith(keyword.toLowerCase()));
+                if (!startsWithThinking) {
+                    sendToPhone({
+                        type: 'claude',
+                        content,
+                        timestamp: Date.now(),
+                    });
+                }
+            }
+        }
+    }
+}
+// ============================================================================
+// Hook 事件处理 - 主要的状态获取方式
+// ============================================================================
+function handleHookEvent(event) {
+    if (!state.wsClient?.isConnected)
+        return;
+    console.log(`[Hook] 收到事件: ${event.event}`);
+    // 发送状态更新
+    if (event.status) {
+        state.wsClient.send({
+            type: 'status',
+            status: event.status.type,
+            content: event.status.message || '',
+        });
+    }
+    // 发送消息
+    if (event.message) {
+        const msg = event.message;
+        // 去重检查
+        if (isDuplicate(msg.content, msg.type)) {
+            return;
+        }
+        const parsedMessage = {
+            type: msg.type,
+            content: msg.content,
+            timestamp: event.timestamp,
+            requiresResponse: msg.requiresResponse,
+            options: msg.options,
+            tool: msg.tool,
+        };
+        state.wsClient.send({
+            type: 'message',
+            message: parsedMessage,
+        });
+    }
+}
+// ============================================================================
+// 远程消息处理
+// ============================================================================
 function handleRemoteMessage(msg) {
     switch (msg.type) {
         case 'input':
             // 来自手机的输入 -> 直接写入 PTY
             if (msg.text && state.shell) {
-                // Claude Code: Enter=发送, Shift+Enter=换行
                 const text = msg.text.trim();
                 if (text) {
-                    // 先写入文字，稍后发送 Enter
                     state.shell.write(text);
                     setTimeout(() => {
-                        state.shell?.write('\r'); // Enter 键发送
+                        state.shell?.write('\r');
                     }, 50);
                 }
             }
@@ -188,179 +323,45 @@ function handleRemoteMessage(msg) {
             state.wsClient?.send({ type: 'pong' });
             break;
         case 'paired':
-            console.log('\n✅ 手机已连接！现在可以通过手机控制此终端。\n');
-            console.log('💡 提示: 手机发送 "claude" 可启动 Claude Code\n');
+            // 手机已连接
+            console.log('\n[已连接] 手机客户端已配对\n');
             break;
         default:
-            // 忽略未知消息
             break;
     }
 }
-// 完整移除所有终端控制序列和特殊字符
-function stripTerminalSequences(str) {
-    let result = str;
-    // 1. OSC (Operating System Command) 序列: ESC ] ... (BEL 或 ST)
-    //    包括窗口标题、超链接等: \x1b]0;...\x07 或 \x1b]...\x1b\\
-    result = result.replace(/\x1b\][\x00-\x06\x08-\x1a\x1c-\xff]*(?:\x07|\x1b\\)/g, '');
-    // 更宽松的 OSC 匹配（处理不完整的序列）
-    result = result.replace(/\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)?/g, '');
-    // 处理 ]0; 等残留（有时 ESC 被吞掉）
-    result = result.replace(/\][0-9];[^\x07\x1b\n]*/g, '');
-    // 2. CSI (Control Sequence Introducer) 序列: ESC [ ... 或 0x9B ...
-    //    包括颜色、光标移动、清屏等
-    result = result.replace(/\x1b\[[0-9;?]*[A-Za-z]/g, '');
-    result = result.replace(/\x9b[0-9;?]*[A-Za-z]/g, '');
-    // 3. DCS (Device Control String): ESC P ... ST
-    result = result.replace(/\x1bP[^\x1b]*\x1b\\/g, '');
-    // 4. 其他 ESC 序列
-    result = result.replace(/\x1b[NOPXZcn^_\[\]()#%*+\-./][^\x1b]*/g, '');
-    // 简单的 ESC 后跟单字符
-    result = result.replace(/\x1b[=>78MDEFH]/g, '');
-    // 任何残留的 ESC 序列
-    result = result.replace(/\x1b[^m\n]*/g, '');
-    // 5. 控制字符 (保留换行、回车、制表符)
-    result = result.replace(/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/g, '');
-    // 6. 方框绘制字符转换为简单字符
-    const boxDrawingMap = {
-        '━': '-', '─': '-', '│': '|', '┃': '|',
-        '┌': '+', '┐': '+', '└': '+', '┘': '+',
-        '├': '+', '┤': '+', '┬': '+', '┴': '+', '┼': '+',
-        '╔': '+', '╗': '+', '╚': '+', '╝': '+',
-        '╠': '+', '╣': '+', '╦': '+', '╩': '+', '╬': '+',
-        '═': '=', '║': '|',
-        '▀': ' ', '▄': ' ', '█': '#', '▌': '|', '▐': '|',
-        '░': '.', '▒': '#', '▓': '#',
-        '●': '*', '○': 'o', '◆': '*', '◇': 'o',
-        '■': '#', '□': '[]', '▪': '*', '▫': '-',
-        '►': '>', '◄': '<', '▲': '^', '▼': 'v',
-        '★': '*', '☆': '*',
-        '·': '.', '•': '*', '‣': '>',
-        '…': '...', '—': '-', '–': '-',
-    };
-    for (const [char, replacement] of Object.entries(boxDrawingMap)) {
-        result = result.split(char).join(replacement);
-    }
-    // 7. 清理多余的连续横线/空行
-    result = result.replace(/[-=]{10,}/g, '----------');
-    result = result.replace(/\n{3,}/g, '\n\n');
-    return result;
+// ============================================================================
+// UI 显示
+// ============================================================================
+function displayQRCode() {
+    const encodedName = encodeURIComponent(state.name);
+    const pairingCode = `cc://${state.id}:${state.secret}:${encodedName}`;
+    console.log('\n用手机扫描二维码连接:\n');
+    qrcode_terminal_1.default.generate(pairingCode, { small: true }, (code) => {
+        console.log(code);
+    });
+    console.log(`\n会话: ${state.name}`);
+    console.log(`Hook 服务器: http://127.0.0.1:${hooks_1.HOOK_SERVER_PORT}\n`);
 }
-/**
- * 累积输出到缓冲区，延迟处理
- * 解决流式输出导致消息被拆分的问题
- */
-function sendOutput(data) {
-    if (!state.wsClient?.isConnected)
-        return;
-    // 累积到缓冲区
-    rawOutputBuffer += data;
-    // 重置定时器 - 每次有新数据就重新等待
-    if (flushTimer) {
-        clearTimeout(flushTimer);
-    }
-    // 检查是否有明确的结束标志（提示符），立即处理
-    const hasPrompt = /❯\s*$/.test(rawOutputBuffer) || /^❯/m.test(rawOutputBuffer);
-    const delay = hasPrompt ? 50 : FLUSH_DELAY;
-    flushTimer = setTimeout(() => {
-        flushOutputBuffer();
-    }, delay);
+// ============================================================================
+// 工具函数
+// ============================================================================
+function sendToPhone(message) {
+    state.wsClient?.send({
+        type: 'message',
+        message,
+    });
 }
-// 值得发送到手机的消息类型
-// 注意：不包含 user_input，因为 iOS 端已经本地显示了用户输入
-const SENDABLE_TYPES = new Set([
-    'claude', // Claude 的回复
-    // 'user_input',    // 不发送 - iOS 已本地显示
-    'tool_call', // 工具调用
-    'tool_result', // 工具结果
-    'tool_error', // 工具错误
-    'question', // 需要回答的问题
-    'permission_request', // 权限请求
-    'selection_dialog', // 选择对话
-    'confirmation', // 确认对话
-    'error', // 错误
-]);
-// 状态类消息（只更新状态，不添加到消息列表）
-const STATUS_TYPES = new Set([
-    'thinking',
-    'status_bar',
-    'task_status',
-]);
-/**
- * 处理缓冲区内容
- */
-function flushOutputBuffer() {
-    if (!rawOutputBuffer || !state.wsClient?.isConnected)
-        return;
-    const bufferToProcess = rawOutputBuffer;
-    rawOutputBuffer = '';
-    flushTimer = null;
-    // 重置 parser 状态，用完整的缓冲区内容解析
-    (0, parser_1.resetParser)();
-    const messages = (0, parser_1.parseOutput)(bufferToProcess);
-    const flushed = (0, parser_1.flushBuffer)();
-    const allMessages = [...messages, ...flushed];
-    if (allMessages.length === 0)
-        return;
-    // 过滤和分类消息
-    const messagesToSend = [];
-    let latestStatus = null;
-    for (const msg of allMessages) {
-        // 过滤噪音：内容太短或主要是特殊字符
-        if (msg.content.length < 5)
-            continue;
-        if (/^[\s·•✻✽✶✳✢…↵]+$/.test(msg.content))
-            continue;
-        // 过滤残缺的思考状态
-        if (/thinking\)?|thought for/i.test(msg.content) && msg.content.length < 30)
-            continue;
-        if (SENDABLE_TYPES.has(msg.type)) {
-            messagesToSend.push(msg);
-        }
-        else if (STATUS_TYPES.has(msg.type)) {
-            latestStatus = msg; // 只保留最新的状态
-        }
-        // raw 类型：只有内容有意义才发送
-        else if (msg.type === 'raw') {
-            // 过滤明显的噪音
-            if (/^[a-z]{2,4}↵/i.test(msg.content))
-                continue; // 如 "tin↵", "dul↵"
-            if (/·\s*thinking/i.test(msg.content))
-                continue;
-            if (msg.content.length > 20) {
-                messagesToSend.push(msg);
-            }
-        }
-    }
-    // 调试日志
-    if (messagesToSend.length > 0 || latestStatus) {
-        console.log(`\n[DEBUG] 处理结果: ${messagesToSend.length} 条消息, 状态: ${latestStatus?.type || '无'}`);
-        for (const m of messagesToSend) {
-            const preview = m.content.replace(/\n/g, '↵').substring(0, 80);
-            console.log(`  [${m.type}] ${preview}...`);
-        }
-    }
-    // 发送状态更新（如果有）
-    if (latestStatus) {
-        state.wsClient.send({
-            type: 'status',
-            status: latestStatus.type,
-            content: latestStatus.content,
-        });
-    }
-    // 发送消息（去重）
-    for (const msg of messagesToSend) {
-        if (isDuplicateMessage(msg)) {
-            console.log(`[DEBUG] 跳过重复: [${msg.type}]`);
-            continue;
-        }
-        state.wsClient.send({
-            type: 'message',
-            message: msg,
-        });
-    }
+function stripAnsiCodes(str) {
+    return str
+        .replace(/\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)?/g, '')
+        .replace(/\x1b\[[0-9;?]*[A-Za-z]/g, '')
+        .replace(/\x1b[^m\n]*m?/g, '')
+        .replace(/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/g, '');
 }
 function cleanup() {
-    console.log('\n正在清理...');
+    hookServerRunning = false;
+    (0, hooks_1.stopHookServer)();
     if (state.shell) {
         state.shell.kill();
         state.shell = null;

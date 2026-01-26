@@ -2,8 +2,8 @@
 //  OnboardingView.swift
 //  cc connect
 //
-//  Design System v2.0 - 引导页
-//  单页完成引导，简洁明了
+//  Design System v3.0 - MUJI 风格引导页
+//  极简、大量留白、克制的视觉
 //
 
 import SwiftUI
@@ -17,72 +17,69 @@ struct OnboardingView: View {
             // 背景
             CCColor.bgPrimary.ignoresSafeArea()
 
-            VStack(spacing: CCSpacing.xxl) {
+            VStack(spacing: 0) {
                 Spacer()
 
-                // Logo 和标题
-                VStack(spacing: CCSpacing.md) {
-                    Image(systemName: CCIcon.logo)
-                        .font(.system(size: 56))
-                        .foregroundColor(CCColor.accentClaude)
-
+                // 标题 - 极简，无图标
+                VStack(spacing: CCSpacing.sm) {
                     Text("CC Connect")
-                        .font(.ccLargeTitle)
+                        .font(.ccTitle2)
                         .foregroundColor(CCColor.textPrimary)
 
                     Text("Claude Code 移动控制台")
-                        .font(.ccSubheadline)
-                        .foregroundColor(CCColor.textSecondary)
+                        .font(.ccCaption)
+                        .foregroundColor(CCColor.textTertiary)
                 }
 
                 Spacer()
+                    .frame(height: CCSpacing.xxxl)
 
-                // 步骤卡片
-                VStack(spacing: CCSpacing.md) {
-                    StepCard(
+                // 步骤 - 纯文字，大留白
+                VStack(alignment: .leading, spacing: CCSpacing.xl) {
+                    StepText(
                         number: "1",
-                        title: "在终端安装 CLI",
+                        title: "安装",
                         command: "npm i -g huashu-cc@latest",
                         isCopied: copiedCommand == "npm i -g huashu-cc@latest"
                     ) {
                         copyCommand("npm i -g huashu-cc@latest")
                     }
 
-                    StepCard(
+                    StepText(
                         number: "2",
-                        title: "运行命令",
+                        title: "启动",
                         command: "huashu-cc start",
                         isCopied: copiedCommand == "huashu-cc start"
                     ) {
                         copyCommand("huashu-cc start")
                     }
 
-                    StepCard(
+                    StepText(
                         number: "3",
-                        title: "扫描二维码",
-                        description: "准备好后点击下方按钮"
+                        title: "扫码连接",
+                        description: nil
                     )
                 }
-                .padding(.horizontal, CCSpacing.lg)
+                .padding(.horizontal, CCSpacing.xxl)
 
                 Spacer()
 
                 // 操作按钮
-                VStack(spacing: CCSpacing.md) {
+                VStack(spacing: CCSpacing.lg) {
                     CCPrimaryButton(
-                        title: "扫描二维码",
+                        title: "扫码连接",
                         action: { showOnboarding = false },
                         icon: CCIcon.scan
                     )
 
-                    CCTextButton(
-                        title: "跳过，稍后连接",
-                        action: { showOnboarding = false },
-                        color: CCColor.textTertiary
-                    )
+                    Button(action: { showOnboarding = false }) {
+                        Text("跳过")
+                            .font(.ccCaption)
+                            .foregroundColor(CCColor.textTertiary)
+                    }
                 }
-                .padding(.horizontal, CCSpacing.lg)
-                .padding(.bottom, CCSpacing.xxl)
+                .padding(.horizontal, CCSpacing.xxl)
+                .padding(.bottom, CCSpacing.xxxl)
             }
         }
     }
@@ -101,7 +98,60 @@ struct OnboardingView: View {
     }
 }
 
-// MARK: - Step Card
+// MARK: - Step Text (MUJI Style)
+
+/// 步骤文字 - 极简设计，无卡片背景
+struct StepText: View {
+    let number: String
+    let title: String
+    var command: String? = nil
+    var description: String? = nil
+    var isCopied: Bool = false
+    var onCopy: (() -> Void)? = nil
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: CCSpacing.xs) {
+            // 步骤标题
+            HStack(spacing: CCSpacing.sm) {
+                Text(number)
+                    .font(.ccCaption)
+                    .foregroundColor(CCColor.textTertiary)
+
+                Text(title)
+                    .font(.ccBody)
+                    .foregroundColor(CCColor.textPrimary)
+            }
+
+            // 命令（如果有）
+            if let command = command {
+                Button(action: { onCopy?() }) {
+                    HStack {
+                        Text(command)
+                            .font(.ccCode)
+                            .foregroundColor(CCColor.textSecondary)
+
+                        Spacer()
+
+                        if isCopied {
+                            Text("✓")
+                                .font(.ccCaption)
+                                .foregroundColor(CCColor.accentSuccess)
+                        }
+                    }
+                }
+            }
+
+            // 描述（如果有）
+            if let description = description {
+                Text(description)
+                    .font(.ccCaption)
+                    .foregroundColor(CCColor.textTertiary)
+            }
+        }
+    }
+}
+
+// MARK: - Legacy StepCard (保持兼容)
 
 struct StepCard: View {
     let number: String
@@ -112,57 +162,14 @@ struct StepCard: View {
     var onCopy: (() -> Void)? = nil
 
     var body: some View {
-        HStack(spacing: CCSpacing.md) {
-            // 步骤编号
-            Text(number)
-                .font(.ccHeadline)
-                .foregroundColor(.white)
-                .frame(width: 32, height: 32)
-                .background(CCColor.accentClaude)
-                .clipShape(Circle())
-
-            // 内容
-            VStack(alignment: .leading, spacing: CCSpacing.xs) {
-                Text(title)
-                    .font(.ccHeadline)
-                    .foregroundColor(CCColor.textPrimary)
-
-                if let command = command {
-                    HStack {
-                        Text(command)
-                            .font(.ccCode)
-                            .foregroundColor(CCColor.terminalText)
-
-                        Spacer()
-
-                        if let onCopy = onCopy {
-                            Button(action: onCopy) {
-                                HStack(spacing: CCSpacing.xxs) {
-                                    Image(systemName: isCopied ? "checkmark" : CCIcon.copy)
-                                    Text(isCopied ? "已复制" : "复制")
-                                }
-                                .font(.ccCaption)
-                                .foregroundColor(isCopied ? CCColor.accentSuccess : CCColor.accentPrimary)
-                            }
-                        }
-                    }
-                    .padding(CCSpacing.sm)
-                    .background(CCColor.terminalBg)
-                    .clipShape(RoundedRectangle(cornerRadius: CCRadius.sm))
-                }
-
-                if let description = description {
-                    Text(description)
-                        .font(.ccCaption)
-                        .foregroundColor(CCColor.textSecondary)
-                }
-            }
-
-            Spacer()
-        }
-        .padding(CCSpacing.md)
-        .background(CCColor.bgSecondary)
-        .clipShape(RoundedRectangle(cornerRadius: CCRadius.md))
+        StepText(
+            number: number,
+            title: title,
+            command: command,
+            description: description,
+            isCopied: isCopied,
+            onCopy: onCopy
+        )
     }
 }
 

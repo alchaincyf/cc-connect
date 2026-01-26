@@ -2,7 +2,7 @@
 //  SessionListView.swift
 //  cc connect
 //
-//  Design System v2.0 - 会话列表页
+//  Design System v3.0 - MUJI 风格会话列表页
 //
 
 import SwiftUI
@@ -84,6 +84,10 @@ struct SessionListView: View {
     private var sessionList: some View {
         ScrollView {
             LazyVStack(spacing: CCSpacing.md) {
+                // 顶部扫码按钮 - 首屏最重要的操作入口
+                ScanButton(action: { showScanView = true })
+                    .padding(.bottom, CCSpacing.md)
+
                 // 活跃连接区
                 if !activeSessions.isEmpty {
                     SectionHeaderView(
@@ -128,10 +132,6 @@ struct SessionListView: View {
                         }
                     }
                 }
-
-                // 新建连接按钮
-                AddNewButton(action: { showScanView = true })
-                    .padding(.top, CCSpacing.sm)
             }
             .padding(CCSpacing.lg)
         }
@@ -146,28 +146,23 @@ struct SessionListView: View {
 
 // MARK: - Empty State View
 
+/// 空状态 - MUJI 风格：极简文字，大量留白
 struct EmptyStateView: View {
     let onScan: () -> Void
 
     var body: some View {
-        VStack(spacing: CCSpacing.xxl) {
+        VStack(spacing: CCSpacing.xxxl) {
             Spacer()
 
-            // 图标
-            Image(systemName: CCIcon.empty)
-                .font(.system(size: 60))
-                .foregroundColor(CCColor.textTertiary)
-
-            // 文字
+            // 文字 - 无图标，纯文字
             VStack(spacing: CCSpacing.md) {
-                Text("还没有连接")
-                    .font(.ccTitle2)
+                Text("尚无连接")
+                    .font(.ccBody)
                     .foregroundColor(CCColor.textPrimary)
 
-                Text("连接你的 Mac，随时随地\n控制 Claude Code")
-                    .font(.ccBody)
-                    .foregroundColor(CCColor.textSecondary)
-                    .multilineTextAlignment(.center)
+                Text("扫码连接你的 Mac")
+                    .font(.ccCaption)
+                    .foregroundColor(CCColor.textTertiary)
             }
 
             // 按钮
@@ -176,35 +171,34 @@ struct EmptyStateView: View {
                 action: onScan,
                 icon: CCIcon.scan
             )
-            .padding(.horizontal, CCSpacing.xxxxl)
+            .padding(.horizontal, CCSpacing.xxxl)
 
             Spacer()
         }
-        .padding(CCSpacing.lg)
+        .padding(CCSpacing.xl)
     }
 }
 
 // MARK: - Section Header
 
+/// 区域头部 - MUJI 风格：极简，无图标
 struct SectionHeaderView: View {
     let title: String
-    let icon: String
+    let icon: String  // 保留参数但不使用
 
     var body: some View {
-        HStack(spacing: CCSpacing.xs) {
-            Image(systemName: icon)
-                .font(.caption)
-            Text(title)
-                .font(.ccCaption)
-        }
-        .foregroundColor(CCColor.textSecondary)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, CCSpacing.xs)
+        Text(title)
+            .font(.ccCaption)
+            .foregroundColor(CCColor.textTertiary)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, CCSpacing.xs)
+            .padding(.vertical, CCSpacing.xs)
     }
 }
 
 // MARK: - Session Card
 
+/// 会话卡片 - MUJI 风格：极简，大留白
 struct CCSessionCard: View {
     let session: Session
     let onTap: () -> Void
@@ -214,73 +208,61 @@ struct CCSessionCard: View {
             CCHaptic.light()
             onTap()
         }) {
-            VStack(alignment: .leading, spacing: CCSpacing.sm) {
-                // 头部：状态 + 名称 + 徽章
-                HStack(spacing: CCSpacing.sm) {
-                    CCStatusIndicator(status: session.status)
+            HStack(spacing: CCSpacing.md) {
+                // 左侧状态指示线
+                Rectangle()
+                    .fill(CCColor.statusColor(for: session.status))
+                    .frame(width: 3)
+                    .clipShape(RoundedRectangle(cornerRadius: 1.5))
 
+                // 内容
+                VStack(alignment: .leading, spacing: CCSpacing.xs) {
+                    // 名称
                     Text(session.name)
-                        .font(.ccHeadline)
+                        .font(.ccBody)
                         .foregroundColor(CCColor.textPrimary)
 
-                    Spacer()
-
-                    // 需要输入徽章
-                    if session.status == .waiting {
-                        Text("需要输入")
-                            .font(.ccCaption2)
-                            .foregroundColor(.white)
-                            .padding(.horizontal, CCSpacing.sm)
-                            .padding(.vertical, CCSpacing.xxs)
-                            .background(CCColor.accentWarning)
-                            .clipShape(Capsule())
-                    }
-                }
-
-                // 元信息
-                HStack(spacing: CCSpacing.xs) {
-                    Text(session.status.displayText)
-                        .font(.ccFootnote)
-                        .foregroundColor(CCColor.textSecondary)
-                    Text("·")
-                        .foregroundColor(CCColor.textTertiary)
-                    Text(session.lastActivity.timeAgo)
-                        .font(.ccFootnote)
+                    // 状态 + 时间
+                    Text("\(session.status.displayText) · \(session.lastActivity.timeAgo)")
+                        .font(.ccCaption)
                         .foregroundColor(CCColor.textTertiary)
                 }
 
-                // 最后消息预览
-                if let lastMessage = session.messages.last {
-                    Text("> \(lastMessage.content)")
-                        .font(.ccCodeSmall)
-                        .foregroundColor(CCColor.textTertiary)
-                        .lineLimit(1)
+                Spacer()
+
+                // 需要输入时显示小圆点
+                if session.status == .waiting {
+                    Circle()
+                        .fill(CCColor.accentWarning)
+                        .frame(width: 8, height: 8)
                 }
             }
-            .padding(CCSpacing.lg)
-            .background(CCColor.bgSecondary)
-            .clipShape(RoundedRectangle(cornerRadius: CCRadius.md))
+            .padding(.vertical, CCSpacing.md)
+            .padding(.horizontal, CCSpacing.lg)
         }
         .buttonStyle(.plain)
     }
 }
 
-// MARK: - Add New Button
+// MARK: - Scan Button (顶部主按钮)
 
-struct AddNewButton: View {
+/// 扫码按钮 - MUJI 风格：简洁但明显的主操作入口
+struct ScanButton: View {
     let action: () -> Void
 
     var body: some View {
         Button(action: {
-            CCHaptic.light()
+            CCHaptic.medium()
             action()
         }) {
-            HStack(spacing: CCSpacing.sm) {
-                Image(systemName: CCIcon.add)
-                Text("扫码新建连接")
+            HStack(spacing: CCSpacing.md) {
+                Image(systemName: CCIcon.scan)
+                    .font(.system(size: 20))
+
+                Text("扫码连接")
+                    .font(.ccHeadline)
             }
-            .font(.ccHeadline)
-            .foregroundColor(CCColor.accentPrimary)
+            .foregroundColor(CCColor.textPrimary)
             .frame(maxWidth: .infinity)
             .frame(height: CCSize.buttonHeight)
             .background(CCColor.bgSecondary)
@@ -290,6 +272,7 @@ struct AddNewButton: View {
                     .stroke(CCColor.borderDefault, lineWidth: 1)
             )
         }
+        .buttonStyle(.plain)
     }
 }
 
