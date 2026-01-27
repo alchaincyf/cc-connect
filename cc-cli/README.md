@@ -1,4 +1,4 @@
-# CC Connect
+# Peanut
 
 在手机上远程控制 Claude Code 的 CLI 工具。
 
@@ -12,7 +12,7 @@
 ## 安装
 
 ```bash
-npm install -g huashu-cc@latest
+npm install -g peanut-cc@latest
 ```
 
 > 注意：使用 `@latest` 确保安装最新版本，避免 npm 缓存问题。
@@ -22,7 +22,7 @@ npm install -g huashu-cc@latest
 ### 1. 安装 Hooks（首次安装必须）
 
 ```bash
-huashu-cc install-hooks
+peanut install-hooks
 ```
 
 > **重要**：Hooks 配置让 Claude Code 能够将状态同步到手机。首次安装后只需执行一次。
@@ -31,32 +31,32 @@ huashu-cc install-hooks
 
 ```bash
 # 启动会话（显示配对二维码）
-huashu-cc start
+peanut start
 
 # 自定义会话名称
-huashu-cc start -n "我的项目"
+peanut start -n "我的项目"
 
 # 使用自定义中继服务器（推荐敏感项目使用）
-huashu-cc start -s "wss://your-relay-server.com"
+peanut start -s "wss://your-relay-server.com"
 ```
 
 ### 3. 用 App 扫码连接
 
-打开 CC Connect App，扫描终端中的二维码即可配对。
+打开 Peanut App，扫描终端中的二维码即可配对。
 
 ## 其他命令
 
 ```bash
 # 检查 Hooks 配置状态
-huashu-cc check-hooks
+peanut check-hooks
 
 # 查看 Hooks 配置内容（不安装）
-huashu-cc install-hooks --show
+peanut install-hooks --show
 ```
 
 ## 配套 App
 
-扫描二维码需要配套的 iOS App：**CC Connect**
+扫描二维码需要配套的 iOS App：**Peanut**
 
 App 功能：
 - 扫码快速配对
@@ -68,7 +68,7 @@ App 功能：
 
 ```
 ┌─────────────┐                      ┌─────────────┐
-│   iOS App   │  ◄───── 同步 ──────► │   huashu-cc start  │
+│   iOS App   │  ◄───── 同步 ──────► │ peanut start│
 │             │      WebSocket       │             │
 └─────────────┘                      └──────┬──────┘
        │                                    │ PTY
@@ -79,7 +79,7 @@ App 功能：
 └─────────────┘
 ```
 
-1. `huashu-cc start` 启动 Claude Code，包装在 PTY 中
+1. `peanut start` 启动 Claude Code，包装在 PTY 中
 2. 解析输出为结构化消息，通过 WebSocket 发送
 3. 云端中继服务转发消息到 iOS App
 4. App 可发送指令回传到 CLI
@@ -157,7 +157,7 @@ npx wrangler login
 编辑 `wrangler.toml`，修改 `name` 为你自己的服务名：
 
 ```toml
-name = "my-cc-relay"  # 改成你的名字
+name = "my-peanut-relay"  # 改成你的名字
 ```
 
 **5. 部署**
@@ -168,13 +168,13 @@ npm run deploy
 
 部署成功后会显示你的服务地址，类似：
 ```
-https://my-cc-relay.你的用户名.workers.dev
+https://my-peanut-relay.你的用户名.workers.dev
 ```
 
 **6. 使用自建服务**
 
 ```bash
-huashu-cc start -s "wss://my-cc-relay.你的用户名.workers.dev"
+peanut start -s "wss://my-peanut-relay.你的用户名.workers.dev"
 ```
 
 ### Cloudflare 免费额度
@@ -236,10 +236,10 @@ A: 这是因为 `node-pty` 原生模块与当前 Node 版本不兼容。解决�
 # 方案 1: 切换到 Node LTS 版本（推荐）
 nvm install 20
 nvm use 20
-npm install -g huashu-cc
+npm install -g peanut-cc
 
 # 方案 2: 手动重新编译（需要 Xcode 命令行工具）
-cd $(npm root -g)/huashu-cc
+cd $(npm root -g)/peanut-cc
 npm rebuild node-pty
 ```
 

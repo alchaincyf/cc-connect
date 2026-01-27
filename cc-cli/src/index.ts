@@ -8,8 +8,8 @@ import { version } from '../package.json';
 const program = new Command();
 
 program
-  .name('cc')
-  .description('CC Connect - Claude Code 移动控制台')
+  .name('peanut')
+  .description('Peanut - Claude Code 移动控制台')
   .version(version);
 
 program
@@ -47,7 +47,7 @@ program
 
       await installHooksConfig();
       console.log('\n✓ Hooks 配置安装成功！');
-      console.log('\n现在可以运行 `cc start` 启动会话。');
+      console.log('\n现在可以运行 `peanut start` 启动会话。');
       console.log('Claude Code 的事件将自动同步到手机端。\n');
     } catch (error) {
       console.error('安装失败:', error);
@@ -64,7 +64,7 @@ program
       console.log('\n✓ Claude Code Hooks 已配置\n');
     } else {
       console.log('\n✗ Claude Code Hooks 未配置');
-      console.log('运行 `cc install-hooks` 安装配置\n');
+      console.log('运行 `peanut install-hooks` 安装配置\n');
     }
   });
 

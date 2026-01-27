@@ -1,12 +1,12 @@
 #!/usr/bin/env node
 /**
- * cc-hook-notify - Claude Code Hook 通知脚本
+ * peanut-hook-notify - Claude Code Hook 通知脚本
  *
  * 这个脚本由 Claude Code 的 Hooks 系统调用，
- * 将事件转发到 cc-cli 的本地 HTTP 服务器。
+ * 将事件转发到 Peanut CLI 的本地 HTTP 服务器。
  *
  * 用法:
- *   cc-hook-notify <event-type> [sub-type]
+ *   peanut-hook-notify <event-type> [sub-type]
  *
  * 事件类型:
  *   stop              - Claude 完成响应
@@ -103,7 +103,7 @@ async function main() {
   const subType = args[1];
 
   if (!eventType) {
-    console.error('用法: cc-hook-notify <event-type> [sub-type]');
+    console.error('用法: peanut-hook-notify <event-type> [sub-type]');
     process.exit(1);
   }
 

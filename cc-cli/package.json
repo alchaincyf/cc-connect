@@ -1,12 +1,11 @@
 {
-  "name": "huashu-cc",
-  "version": "1.1.2",
-  "description": "Claude Code 移动控制台 CLI 工具 - 在手机上远程控制 Claude Code",
+  "name": "peanut-cc",
+  "version": "1.2.0",
+  "description": "Peanut - Claude Code 移动控制台，在手机上远程控制 Claude Code",
   "main": "dist/index.js",
   "bin": {
-    "huashu-cc": "./dist/index.js",
-    "cc": "./dist/index.js",
-    "cc-hook-notify": "./dist/hook-notify.js"
+    "peanut": "./dist/index.js",
+    "peanut-hook-notify": "./dist/hook-notify.js"
   },
   "scripts": {
     "build": "tsc",

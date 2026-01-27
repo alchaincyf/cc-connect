@@ -41,7 +41,7 @@ struct SessionListView: View {
                     sessionList
                 }
             }
-            .navigationTitle("CC Connect")
+            .navigationTitle("Peanut")
             .navigationBarTitleDisplayMode(.large)
             .toolbarBackground(CCColor.bgPrimary, for: .navigationBar)
             .toolbar {

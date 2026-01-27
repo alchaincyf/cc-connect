@@ -561,10 +561,10 @@ class WebSocketManager: NSObject, ObservableObject {
             print("🎉 已配对!")
             // 避免重复添加配对消息：检查最近是否已有相同的系统消息
             let recentPairedMessage = messages.suffix(5).contains { msg in
-                msg.type == .system && msg.content == "已连接到 Claude Code"
+                msg.type == .system && msg.content == "已连接到 Peanut"
             }
             if !recentPairedMessage {
-                let msg = CCMessage(type: .system, content: "已连接到 Claude Code")
+                let msg = CCMessage(type: .system, content: "已连接到 Peanut")
                 messages.append(msg)
             }
 

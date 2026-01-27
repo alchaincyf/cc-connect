@@ -22,7 +22,7 @@ struct OnboardingView: View {
 
                 // 标题 - 极简，无图标
                 VStack(spacing: CCSpacing.sm) {
-                    Text("CC Connect")
+                    Text("Peanut")
                         .font(.ccTitle2)
                         .foregroundColor(CCColor.textPrimary)
 
@@ -39,29 +39,29 @@ struct OnboardingView: View {
                     StepText(
                         number: "1",
                         title: "安装 CLI",
-                        command: "npm i -g huashu-cc@latest",
-                        isCopied: copiedCommand == "npm i -g huashu-cc@latest"
+                        command: "npm i -g peanut-cc@latest",
+                        isCopied: copiedCommand == "npm i -g peanut-cc@latest"
                     ) {
-                        copyCommand("npm i -g huashu-cc@latest")
+                        copyCommand("npm i -g peanut-cc@latest")
                     }
 
                     StepText(
                         number: "2",
                         title: "配置 Hooks",
-                        command: "huashu-cc install-hooks",
+                        command: "peanut install-hooks",
                         description: "首次安装后只需执行一次",
-                        isCopied: copiedCommand == "huashu-cc install-hooks"
+                        isCopied: copiedCommand == "peanut install-hooks"
                     ) {
-                        copyCommand("huashu-cc install-hooks")
+                        copyCommand("peanut install-hooks")
                     }
 
                     StepText(
                         number: "3",
                         title: "启动会话",
-                        command: "huashu-cc start",
-                        isCopied: copiedCommand == "huashu-cc start"
+                        command: "peanut start",
+                        isCopied: copiedCommand == "peanut start"
                     ) {
-                        copyCommand("huashu-cc start")
+                        copyCommand("peanut start")
                     }
 
                     StepText(

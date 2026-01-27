@@ -94,7 +94,7 @@ export async function startSession(options: SessionOptions): Promise<void> {
   if (!hooksInstalled) {
     console.log('\n[提示] Claude Code Hooks 未配置。');
     console.log('运行以下命令安装 Hooks 配置以获得最佳体验:');
-    console.log('  huashu-cc install-hooks\n');
+    console.log('  peanut install-hooks\n');
   }
 
   // 1. 启动 Hook 服务器

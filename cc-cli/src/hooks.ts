@@ -512,7 +512,7 @@ export function generateHooksConfig(): object {
  */
 function getHookScriptPath(): string {
   // 使用全局安装的脚本路径
-  return 'cc-hook-notify';
+  return 'peanut-hook-notify';
 }
 
 /**

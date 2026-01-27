@@ -64,7 +64,7 @@ struct LaunchScreenView: View {
                     .font(.system(size: 48))
                     .foregroundColor(.ccPrimary)
 
-                Text("CC Connect")
+                Text("Peanut")
                     .font(.title2.weight(.semibold))
                     .foregroundColor(.ccTextPrimary)
             }

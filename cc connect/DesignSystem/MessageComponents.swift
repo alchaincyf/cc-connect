@@ -206,10 +206,10 @@ struct CCSystemRow: View {
 
 // MARK: - Logo View
 
-/// Claude Code Logo - 简约版
+/// Peanut Logo - 简约版
 struct CCLogoView: View {
     var body: some View {
-        Text("Claude Code")
+        Text("Peanut")
             .font(.ccSubheadline)
             .foregroundColor(CCColor.textTertiary)
             .padding(.vertical, CCSpacing.lg)
