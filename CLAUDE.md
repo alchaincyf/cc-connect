@@ -9,10 +9,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ### iOS App
 ```bash
 # 构建（Xcode 命令行）
-xcodebuild -project "Peanut.xcodeproj" -scheme "Peanut" -destination 'platform=iOS Simulator,name=iPhone 16 Pro,OS=18.4' build
+xcodebuild -project "Peanut CC.xcodeproj" -scheme "Peanut CC" -destination 'platform=iOS Simulator,name=iPhone 16 Pro' build
 
 # 或直接用 Xcode 打开
-open "Peanut.xcodeproj"
+open "Peanut CC.xcodeproj"
 ```
 
 ### CLI 工具 (cc-cli/)
@@ -24,10 +24,17 @@ npm install -g peanut-cc@latest
 peanut install-hooks
 
 # 启动会话（显示配对二维码）
-peanut start
+peanut start                    # 会话名默认使用当前目录名
 
 # 带参数运行
-peanut start -n "会话名称" -s "wss://自定义服务器"
+peanut start -n "会话名称"       # 指定会话名称
+peanut start -p 19790           # 指定 Hook 服务器端口（多会话时使用）
+peanut start -s "wss://..."     # 自定义中继服务器
+
+# 辅助命令
+peanut status                   # 查看当前会话状态
+peanut kill                     # 清理所有 Peanut 进程和端口
+peanut kill -p 19790            # 清理指定端口
 
 # 开发：重新编译 TypeScript
 cd cc-cli && npm run build
@@ -69,7 +76,7 @@ npm run tail         # 查看实时日志
 ### 组件说明
 - **iOS App**：SwiftUI 界面，展示输出、发送输入
 - **CC CLI**：Node.js 工具，启动本地 Hook 服务器，接收 Claude Code 事件
-- **Hook Server**：本地 HTTP 服务器（端口 19789），接收 Claude Code Hooks 事件
+- **Hook Server**：本地 HTTP 服务器（默认端口 19789，支持自动切换），接收 Claude Code Hooks 事件
 - **云端中继**：Cloudflare Workers + Durable Objects，WebSocket 路由和消息转发
 
 ### 核心改进：Hooks 架构
@@ -240,9 +247,12 @@ websocket.ts   # WebSocket 客户端，自动重连，心跳
 ```
 
 **CLI 命令**：
-- `peanut start` - 启动会话，显示配对二维码
+- `peanut start` - 启动会话，显示配对二维码（默认使用目录名作为会话名）
+- `peanut start -p <port>` - 指定 Hook 服务器端口（多会话时使用）
 - `peanut install-hooks` - 安装 Claude Code Hooks 配置
 - `peanut check-hooks` - 检查 Hooks 配置状态
+- `peanut status` - 查看当前会话状态
+- `peanut kill` - 清理所有 Peanut 进程和端口
 
 **配对码格式**：`cc://<sessionId>:<secret>:<name>`
 
@@ -421,11 +431,10 @@ Text(String(localized: "key_name"))
 
 **排查步骤**：
 
-1. **检查 Hook 服务器端口是否被占用**
+1. **检查 Hook 服务器是否正常启动**
    ```bash
-   lsof -i :19789
-   # 如果有进程占用，杀掉它：
-   kill -9 $(lsof -t -i:19789)
+   peanut status                   # 查看当前会话状态
+   # v1.2.5+ 会自动切换端口，如果看到"使用端口 19790"说明正常
    ```
 
 2. **检查 Hooks 配置是否使用正确的脚本名**
@@ -445,16 +454,19 @@ Text(String(localized: "key_name"))
    - App 日志应该显示 "✅ WebSocket 已连接"
    - CLI 应该显示 "[已连接] 手机客户端已配对"
 
-### 问题：端口 19789 被占用
+### 问题：端口被占用（v1.2.5+ 已自动处理）
 
-**原因**：上次 `peanut start` 没有正常退出，进程残留。
+**v1.2.5+ 行为**：CLI 会自动尝试下一个可用端口（19789 → 19790 → ...），最多尝试 10 次。
 
-**解决**：
+**如果仍需手动清理**：
 ```bash
+peanut kill                     # 清理所有 Peanut 进程
+peanut kill -p 19789            # 清理指定端口
+# 或手动：
 kill -9 $(lsof -t -i:19789)
-# 或
-pkill -f "peanut"
 ```
+
+**多会话支持**：可以同时运行多个 `peanut start`，每个会话使用不同端口。
 
 ### 问题：品牌重命名后消息不同步
 
@@ -517,11 +529,35 @@ if (hooksInstalled && hookServerRunning) {
 
 | 项目 | 内容 |
 |------|------|
-| **阶段** | Phase 3 开发 - 性能优化完成 |
-| **进度** | v1.3.0 性能优化 + Bug 修复 |
-| **上次决策** | 优化消息列表性能，修复重复连接 Bug |
+| **阶段** | Phase 3 开发 - 多会话支持 & 状态优化 |
+| **进度** | v1.2.6 CLI + iOS 状态显示优化 |
+| **上次决策** | 自动端口切换支持多会话，会话名使用目录名，优化断开状态显示 |
 
 ### 最新完成 (2026-01-27)
+
+**v1.2.6 - 会话名 & 状态显示优化**
+
+- ✅ **会话名称改进**
+  - 默认使用当前工作目录名作为会话名（不再是"新会话"）
+  - `--name` 参数仍可手动指定
+
+- ✅ **iOS 状态显示优化**
+  - 断开连接时正确更新 `session.status = .disconnected`
+  - 状态文字改进：`idle` → "已连接"，`disconnected` → "已断开"
+  - 会话列表分组改进：活跃连接 vs 已断开（不再是"历史记录"）
+  - 添加 `isActiveStatus` 计算属性用于列表分组
+
+**v1.2.5 - 多会话支持 & 自动端口切换**
+
+- ✅ **自动端口切换**
+  - 端口被占用时自动尝试下一个端口（19789 → 19790 → ...）
+  - 最多尝试 10 次，无需手动清理端口
+  - 支持同时运行多个 `peanut start` 会话
+
+- ✅ **新增 CLI 命令**
+  - `peanut status` - 查看当前会话状态
+  - `peanut kill` - 清理所有 Peanut 进程和端口
+  - `peanut start -p <port>` - 指定 Hook 服务器端口
 
 **v1.3.0 - 性能优化 & Bug 修复**
 
@@ -561,7 +597,7 @@ if (hooksInstalled && hookServerRunning) {
 
 ### 之前版本
 
-**v1.2.x** - 品牌统一 (Peanut)、Hooks 兼容性修复、端口占用提示
+**v1.2.x** - 品牌统一 (Peanut)、Hooks 兼容性修复、自动端口切换、多会话支持
 **v1.1.x** - Hooks 架构、Markdown 渲染、Bug 修复
 **v1.0.x** - 初始版本，PTY 解析模式
 
@@ -786,7 +822,7 @@ npm publish --access public
 ### 当前版本
 
 - **包名**: peanut-cc
-- **最新版本**: 1.2.2
+- **最新版本**: 1.2.6
 - **安装命令**: `npm install -g peanut-cc@latest`
 - **首次配置**: `peanut install-hooks`（必须）
 - **可执行文件**: `peanut`, `peanut-hook-notify`
