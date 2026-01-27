@@ -508,6 +508,13 @@ class WebSocketManager: NSObject, ObservableObject {
         webSocket = nil
         urlSession?.invalidateAndCancel()
         urlSession = nil
+
+        // 更新会话的持久化状态为已断开
+        if let session = session {
+            session.status = .disconnected
+            session.isConnected = false
+        }
+
         connectionState = .disconnected
         // 清除会话引用
         session = nil
@@ -808,6 +815,11 @@ class WebSocketManager: NSObject, ObservableObject {
                 self?.performConnect()
             }
         } else {
+            // 重连失败，更新会话状态为已断开
+            if let session = session {
+                session.status = .disconnected
+                session.isConnected = false
+            }
             connectionState = .failed("连接失败，请重试")
         }
     }

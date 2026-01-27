@@ -19,14 +19,14 @@ struct SessionListView: View {
     @State private var sessionToDelete: Session?
     @State private var showDeleteConfirmation = false
 
-    /// 活跃连接（正在连接或已连接）
+    /// 活跃连接（当前正在连接或状态为活跃）
     private var activeSessions: [Session] {
-        sessions.filter { $0.isActive }
+        sessions.filter { $0.isActive || $0.status.isActiveStatus }
     }
 
-    /// 历史会话（未连接）
-    private var historySessions: [Session] {
-        sessions.filter { !$0.isActive }
+    /// 已断开的会话
+    private var disconnectedSessions: [Session] {
+        sessions.filter { !$0.isActive && !$0.status.isActiveStatus }
     }
 
     var body: some View {
@@ -120,15 +120,15 @@ struct SessionListView: View {
                     }
                 }
 
-                // 历史记录区
-                if !historySessions.isEmpty {
+                // 已断开的会话
+                if !disconnectedSessions.isEmpty {
                     SectionHeaderView(
-                        title: "历史记录",
+                        title: "已断开",
                         icon: CCIcon.history
                     )
                     .padding(.top, activeSessions.isEmpty ? 0 : CCSpacing.md)
 
-                    ForEach(historySessions) { session in
+                    ForEach(disconnectedSessions) { session in
                         CCSessionCard(session: session) {
                             selectedSession = session
                         }

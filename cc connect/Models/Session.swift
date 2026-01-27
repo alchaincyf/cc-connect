@@ -19,15 +19,25 @@ enum SessionStatus: String, Codable {
     var displayText: String {
         switch self {
         case .running:
-            return "运行中"
+            return "处理中"
         case .waiting:
             return "等待输入"
         case .idle:
-            return "空闲"
+            return "已连接"  // 连接中但空闲
         case .error:
             return "错误"
         case .disconnected:
-            return "已断开"
+            return "已断开"  // 未连接
+        }
+    }
+
+    /// 是否为活跃状态（用于列表分组）
+    var isActiveStatus: Bool {
+        switch self {
+        case .running, .waiting, .idle:
+            return true
+        case .error, .disconnected:
+            return false
         }
     }
 }
