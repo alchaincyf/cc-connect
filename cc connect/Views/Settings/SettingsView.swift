@@ -44,7 +44,7 @@ struct SettingsView: View {
                 HStack {
                     Text("版本")
                     Spacer()
-                    Text("1.0.0")
+                    Text("1.3.0")
                         .foregroundColor(.ccTextTertiary)
                 }
 
@@ -54,7 +54,7 @@ struct SettingsView: View {
                     Text("帮助文档")
                 }
 
-                Link(destination: URL(string: "mailto:feedback@cc-connect.app")!) {
+                Link(destination: URL(string: "mailto:alchaincyf@gmail.com")!) {
                     Text("反馈问题")
                 }
 
@@ -117,9 +117,11 @@ struct HelpView: View {
                     title: "如何连接？",
                     content: """
                     1. 在 Mac 终端安装 CLI：
-                       brew install cc-connect
-                    2. 运行命令：cc start
-                    3. 打开 App 扫描终端上显示的二维码
+                       npm install -g peanut-cc@latest
+                    2. 安装 Hooks 配置（首次必须）：
+                       peanut install-hooks
+                    3. 启动会话：peanut start
+                    4. 打开 App 扫描终端上显示的二维码
                     """
                 )
 
@@ -127,9 +129,13 @@ struct HelpView: View {
                     title: "连接断开怎么办？",
                     content: """
                     请确保：
-                    • Mac 上的 cc-cli 正在运行
+                    • Mac 上的 peanut 正在运行
                     • 手机网络连接正常
                     • 如仍无法连接，尝试重新扫码
+
+                    常见问题：
+                    • 端口被占用：kill -9 $(lsof -t -i:19789)
+                    • Hooks 未配置：peanut install-hooks
                     """
                 )
 
@@ -137,8 +143,9 @@ struct HelpView: View {
                     title: "如何发送输入？",
                     content: """
                     当 Claude Code 需要输入时：
-                    • 使用快捷按钮（是/否/继续）
+                    • 使用快捷按钮（允许/拒绝/始终允许）
                     • 或输入自定义文本后点击发送
+                    • 点击中断按钮可发送 Ctrl+C 中断当前任务
                     """
                 )
             }
@@ -172,7 +179,7 @@ struct PrivacyPolicyView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: CCSpacing.lg) {
                 Text("""
-                CC Connect 隐私政策
+                Peanut 隐私政策
 
                 最后更新：2026年1月
 
@@ -182,15 +189,21 @@ struct PrivacyPolicyView: View {
                 • 会话连接信息（用于消息转发）
 
                 2. 数据存储
-                • 消息内容仅在传输时经过我们的服务器，不会持久存储
-                • 会话信息在设备本地存储
+                • 消息内容仅在传输时经过中继服务器，不会持久存储
+                • 会话信息在设备本地存储（SwiftData）
+                • 中继服务器不记录任何消息内容
 
                 3. 数据安全
                 • 所有通信使用 HTTPS/WSS 加密传输
+                • 中继服务器基于 Cloudflare Workers，符合行业安全标准
                 • 我们不会将您的数据出售给第三方
 
-                4. 联系我们
-                如有疑问，请联系：privacy@cc-connect.app
+                4. 开源
+                • CLI 工具和中继服务器代码完全开源
+                • 您可以自行部署私有中继服务器
+
+                5. 联系我们
+                如有疑问，请联系：alchaincyf@gmail.com
                 """)
                 .font(.ccBody)
                 .foregroundColor(.ccTextSecondary)
