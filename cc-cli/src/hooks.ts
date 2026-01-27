@@ -14,6 +14,7 @@ import * as http from 'http';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
+import { execSync } from 'child_process';
 
 // ============================================================================
 // 类型定义
@@ -353,66 +354,124 @@ function processHookEvent(input: HookEventInput): ProcessedEvent | null {
 // HTTP 服务器 - 接收 Hook 事件
 // ============================================================================
 
-const HOOK_SERVER_PORT = 19789; // 本地 Hook 服务器端口
+const DEFAULT_HOOK_SERVER_PORT = 19789; // 默认本地 Hook 服务器端口
+let currentPort = DEFAULT_HOOK_SERVER_PORT;
+
+/**
+ * 杀掉占用指定端口的进程
+ */
+function killProcessOnPort(port: number): boolean {
+  try {
+    // macOS/Linux: 使用 lsof 查找占用端口的进程
+    const pidOutput = execSync(`lsof -t -i:${port} 2>/dev/null || true`, { encoding: 'utf-8' }).trim();
+    if (pidOutput) {
+      const pids = pidOutput.split('\n').filter(p => p);
+      for (const pid of pids) {
+        try {
+          execSync(`kill -9 ${pid} 2>/dev/null || true`);
+          console.log(`[Hook Server] 已清理旧进程 (PID: ${pid})`);
+        } catch {
+          // 忽略杀进程失败
+        }
+      }
+      return true;
+    }
+    return false;
+  } catch {
+    return false;
+  }
+}
 
 /**
  * 启动 Hook 事件监听服务器
+ * @param handler 事件处理器
+ * @param port 起始端口号（可选，默认 19789）
+ * @param autoFindPort 端口被占用时是否自动寻找下一个可用端口（默认 true）
  */
-export function startHookServer(handler: EventHandler): Promise<number> {
+export function startHookServer(
+  handler: EventHandler,
+  port: number = DEFAULT_HOOK_SERVER_PORT,
+  autoFindPort: boolean = true
+): Promise<number> {
+  const MAX_PORT_ATTEMPTS = 10; // 最多尝试 10 个端口
+
   return new Promise((resolve, reject) => {
     eventHandler = handler;
 
-    httpServer = http.createServer((req, res) => {
-      // CORS 头
-      res.setHeader('Access-Control-Allow-Origin', '*');
-      res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-      res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    const tryPort = (currentTryPort: number, attempt: number = 1) => {
+      httpServer = http.createServer((req, res) => {
+        // CORS 头
+        res.setHeader('Access-Control-Allow-Origin', '*');
+        res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+        res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
-      if (req.method === 'OPTIONS') {
-        res.writeHead(200);
-        res.end();
-        return;
-      }
+        if (req.method === 'OPTIONS') {
+          res.writeHead(200);
+          res.end();
+          return;
+        }
 
-      if (req.method === 'POST' && req.url === '/hook') {
-        let body = '';
-        req.on('data', chunk => {
-          body += chunk.toString();
-        });
-        req.on('end', () => {
-          try {
-            const input = JSON.parse(body) as HookEventInput;
-            const processed = processHookEvent(input);
+        if (req.method === 'POST' && req.url === '/hook') {
+          let body = '';
+          req.on('data', chunk => {
+            body += chunk.toString();
+          });
+          req.on('end', () => {
+            try {
+              const input = JSON.parse(body) as HookEventInput;
+              const processed = processHookEvent(input);
 
-            if (processed && eventHandler) {
-              eventHandler(processed);
+              if (processed && eventHandler) {
+                eventHandler(processed);
+              }
+
+              res.writeHead(200, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify({ success: true }));
+            } catch (err) {
+              console.error('[Hook Server] 处理事件失败:', err);
+              res.writeHead(400, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify({ error: 'Invalid JSON' }));
             }
+          });
+        } else {
+          res.writeHead(404);
+          res.end('Not Found');
+        }
+      });
 
-            res.writeHead(200, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({ success: true }));
-          } catch (err) {
-            console.error('[Hook Server] 处理事件失败:', err);
-            res.writeHead(400, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({ error: 'Invalid JSON' }));
+      httpServer.on('error', (err: NodeJS.ErrnoException) => {
+        if (err.code === 'EADDRINUSE') {
+          if (autoFindPort && attempt < MAX_PORT_ATTEMPTS) {
+            // 自动尝试下一个端口
+            const nextPort = currentTryPort + 1;
+            console.log(`[Hook Server] 端口 ${currentTryPort} 已被占用，尝试端口 ${nextPort}...`);
+            tryPort(nextPort, attempt + 1);
+            return;
           }
-        });
-      } else {
-        res.writeHead(404);
-        res.end('Not Found');
-      }
-    });
+          console.error(`[Hook Server] 无法找到可用端口（已尝试 ${port}-${currentTryPort}）`);
+          console.error(`请运行 'peanut kill' 清理旧进程，或使用 'peanut start -p <端口>' 指定其他端口`);
+        }
+        reject(err);
+      });
 
-    httpServer.on('error', (err: NodeJS.ErrnoException) => {
-      if (err.code === 'EADDRINUSE') {
-        console.error(`[Hook Server] 端口 ${HOOK_SERVER_PORT} 已被占用`);
-      }
-      reject(err);
-    });
+      httpServer.listen(currentTryPort, '127.0.0.1', () => {
+        currentPort = currentTryPort;
+        if (currentTryPort !== port) {
+          console.log(`[Hook Server] 使用端口 ${currentTryPort}（原端口 ${port} 被占用）`);
+        }
+        resolve(currentTryPort);
+      });
+    };
 
-    httpServer.listen(HOOK_SERVER_PORT, '127.0.0.1', () => {
-      resolve(HOOK_SERVER_PORT);
-    });
+    tryPort(port);
   });
+}
+
+/**
+ * 获取当前 Hook 服务器端口
+ */
+export function getHookServerPort(): number {
+  return currentPort;
 }
 
 /**
@@ -557,7 +616,7 @@ export async function installHooksConfig(): Promise<void> {
 }
 
 /**
- * 检查 Hooks 是否已配置
+ * 检查 Hooks 是否已配置（且使用正确的脚本名）
  */
 export function checkHooksInstalled(): boolean {
   const claudeSettingsPath = path.join(os.homedir(), '.claude', 'settings.json');
@@ -568,10 +627,23 @@ export function checkHooksInstalled(): boolean {
 
   try {
     const config = JSON.parse(fs.readFileSync(claudeSettingsPath, 'utf-8'));
-    return config.hooks?.Stop !== undefined;
+    // 检查是否有 hooks 配置
+    if (!config.hooks?.Stop) {
+      return false;
+    }
+    // 检查是否使用正确的脚本名（peanut-hook-notify）
+    const configStr = JSON.stringify(config.hooks);
+    if (configStr.includes('peanut-hook-notify')) {
+      return true;
+    }
+    // 如果使用旧脚本名（cc-hook-notify），返回 false 以启用备用模式
+    if (configStr.includes('cc-hook-notify')) {
+      return false;
+    }
+    return true;
   } catch {
     return false;
   }
 }
 
-export { HOOK_SERVER_PORT };
+export { DEFAULT_HOOK_SERVER_PORT, currentPort as HOOK_SERVER_PORT };

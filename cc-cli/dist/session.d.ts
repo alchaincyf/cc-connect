@@ -9,6 +9,7 @@
 interface SessionOptions {
     name: string;
     server: string;
+    port?: number;
 }
 export declare function startSession(options: SessionOptions): Promise<void>;
 export {};

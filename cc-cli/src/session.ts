@@ -17,7 +17,8 @@ import {
   stopHookServer,
   ProcessedEvent,
   checkHooksInstalled,
-  HOOK_SERVER_PORT,
+  DEFAULT_HOOK_SERVER_PORT,
+  getHookServerPort,
 } from './hooks';
 import * as path from 'path';
 
@@ -27,6 +28,7 @@ let hookServerRunning = false;
 interface SessionOptions {
   name: string;
   server: string;
+  port?: number;  // Hook 服务器端口（可选，默认 19789）
 }
 
 interface SessionState {
@@ -97,13 +99,17 @@ export async function startSession(options: SessionOptions): Promise<void> {
     console.log('  peanut install-hooks\n');
   }
 
-  // 1. 启动 Hook 服务器
+  // 1. 启动 Hook 服务器（自动寻找可用端口）
+  const hookPort = options.port || DEFAULT_HOOK_SERVER_PORT;
   try {
-    await startHookServer(handleHookEvent);
+    await startHookServer(handleHookEvent, hookPort, true);
     hookServerRunning = true;
   } catch (err: any) {
     hookServerRunning = false;
-    // Hook 服务器启动失败时静默使用备用模式
+    if (err.code === 'EADDRINUSE') {
+      console.log(`\n[错误] 无法找到可用端口，请运行 'peanut kill' 清理旧进程后重试。\n`);
+    }
+    // Hook 服务器启动失败时使用备用模式
   }
 
   // 2. 启动 PTY shell
@@ -211,7 +217,10 @@ function fallbackStateDetection(data: string): void {
   // 只有当 Hooks 已配置且 Hook 服务器运行时，才跳过备用模式
   // 否则即使 Hook 服务器启动了，如果 Hooks 没配置，也不会有事件触发
   const hooksInstalled = checkHooksInstalled();
-  if (hooksInstalled && hookServerRunning) return;
+  if (hooksInstalled && hookServerRunning) {
+    // Hook 模式，跳过备用检测
+    return;
+  }
   if (!state.wsClient?.isConnected) return;
 
   // 累积输出
