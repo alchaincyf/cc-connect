@@ -9,22 +9,31 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ### iOS App
 ```bash
 # 构建（Xcode 命令行）
-xcodebuild -project "cc connect.xcodeproj" -scheme "cc connect" -destination 'platform=iOS Simulator,name=iPhone 15 Pro' build
+xcodebuild -project "Peanut.xcodeproj" -scheme "Peanut" -destination 'platform=iOS Simulator,name=iPhone 16 Pro,OS=18.4' build
 
 # 或直接用 Xcode 打开
-open "cc connect.xcodeproj"
+open "Peanut.xcodeproj"
 ```
 
 ### CLI 工具 (cc-cli/)
 ```bash
-# 运行（会显示配对二维码）
-node cc-cli/dist/index.js start
+# 全局安装
+npm install -g peanut-cc@latest
+
+# 安装 Hooks 配置（首次必须）
+peanut install-hooks
+
+# 启动会话（显示配对二维码）
+peanut start
 
 # 带参数运行
-node cc-cli/dist/index.js start -n "会话名称" -s "wss://自定义服务器"
+peanut start -n "会话名称" -s "wss://自定义服务器"
 
 # 开发：重新编译 TypeScript
 cd cc-cli && npm run build
+
+# 本地开发测试
+cd cc-cli && npm link
 ```
 
 ### 中继服务 (relay-server/)
@@ -85,7 +94,7 @@ Claude Code 官方提供 Hooks 系统，在特定事件发生时触发自定义�
 ```
 Claude Code 执行任务
     ↓ 触发 Hook 事件
-Hook 脚本 (cc-hook-notify)
+Hook 脚本 (peanut-hook-notify)
     ↓ HTTP POST
 CLI Hook Server (端口 19789)
     ↓ 处理事件
@@ -116,16 +125,16 @@ iOS App 显示
 
 ```bash
 # 安装 CLI
-npm install -g huashu-cc
+npm install -g peanut-cc@latest
 
 # 安装 Hooks 配置（推荐）
-huashu-cc install-hooks
+peanut install-hooks
 
 # 查看配置内容
-huashu-cc install-hooks --show
+peanut install-hooks --show
 
 # 检查安装状态
-huashu-cc check-hooks
+peanut check-hooks
 ```
 
 安装后会在 `~/.claude/settings.json` 中添加 hooks 配置。
@@ -138,7 +147,7 @@ huashu-cc check-hooks
     "Stop": [{
       "hooks": [{
         "type": "command",
-        "command": "cc-hook-notify stop",
+        "command": "peanut-hook-notify stop",
         "timeout": 5
       }]
     }],
@@ -147,7 +156,7 @@ huashu-cc check-hooks
         "matcher": "permission_prompt",
         "hooks": [{
           "type": "command",
-          "command": "cc-hook-notify notification permission"
+          "command": "peanut-hook-notify notification permission"
         }]
       }
     ],
@@ -155,7 +164,7 @@ huashu-cc check-hooks
       "matcher": "*",
       "hooks": [{
         "type": "command",
-        "command": "cc-hook-notify pre-tool"
+        "command": "peanut-hook-notify pre-tool"
       }]
     }]
   }
@@ -178,7 +187,7 @@ cc-cli/src/
 
 **Hooks 模式（推荐）**：
 ```
-Claude Code Hook → cc-hook-notify → HTTP POST → Hook Server → WebSocket → iOS
+Claude Code Hook → peanut-hook-notify → HTTP POST → Hook Server → WebSocket → iOS
 ```
 
 **备用模式（Hooks 未配置）**：
@@ -231,9 +240,9 @@ websocket.ts   # WebSocket 客户端，自动重连，心跳
 ```
 
 **CLI 命令**：
-- `huashu-cc start` - 启动会话，显示配对二维码
-- `huashu-cc install-hooks` - 安装 Claude Code Hooks 配置
-- `huashu-cc check-hooks` - 检查 Hooks 配置状态
+- `peanut start` - 启动会话，显示配对二维码
+- `peanut install-hooks` - 安装 Claude Code Hooks 配置
+- `peanut check-hooks` - 检查 Hooks 配置状态
 
 **配对码格式**：`cc://<sessionId>:<secret>:<name>`
 
@@ -255,7 +264,7 @@ index.ts      # Cloudflare Worker + SessionDO Durable Object
 ```
 Claude Code 执行
     ↓ 触发 Hook 事件
-cc-hook-notify 脚本
+peanut-hook-notify 脚本
     ↓ HTTP POST (JSON)
 CLI hooks.ts 处理
     ↓ 转换为 ProcessedEvent
@@ -406,62 +415,162 @@ Text(String(localized: "key_name"))
 
 ---
 
+## 常见问题排查（重要）
+
+### 问题：App 收不到 Claude Code 的回复
+
+**排查步骤**：
+
+1. **检查 Hook 服务器端口是否被占用**
+   ```bash
+   lsof -i :19789
+   # 如果有进程占用，杀掉它：
+   kill -9 $(lsof -t -i:19789)
+   ```
+
+2. **检查 Hooks 配置是否使用正确的脚本名**
+   ```bash
+   grep "hook-notify" ~/.claude/settings.json
+   # 应该显示 "peanut-hook-notify"，不是 "peanut-hook-notify"
+   # 如果是旧名称，重新安装：
+   peanut install-hooks
+   ```
+
+3. **检查 Hooks 是否已安装**
+   ```bash
+   peanut check-hooks
+   ```
+
+4. **检查 WebSocket 连接**
+   - App 日志应该显示 "✅ WebSocket 已连接"
+   - CLI 应该显示 "[已连接] 手机客户端已配对"
+
+### 问题：端口 19789 被占用
+
+**原因**：上次 `peanut start` 没有正常退出，进程残留。
+
+**解决**：
+```bash
+kill -9 $(lsof -t -i:19789)
+# 或
+pkill -f "peanut"
+```
+
+### 问题：品牌重命名后消息不同步
+
+**原因**：用户的 Hooks 配置仍然引用旧脚本名 `peanut-hook-notify`。
+
+**解决**：
+```bash
+peanut install-hooks
+```
+
+### 关键代码逻辑
+
+**消息同步的两种模式**：
+
+1. **Hooks 模式（推荐）**
+   - 条件：`checkHooksInstalled() == true` 且 `hookServerRunning == true`
+   - 流程：Claude Code → Hooks → peanut-hook-notify → HTTP POST → Hook Server → WebSocket → App
+
+2. **备用模式（PTY 解析）**
+   - 条件：Hooks 未配置 或 Hook 服务器未启动
+   - 流程：PTY 输出 → fallbackStateDetection() → WebSocket → App
+
+**关键检查点**：
+```typescript
+// session.ts 中的备用模式判断
+const hooksInstalled = checkHooksInstalled();
+if (hooksInstalled && hookServerRunning) {
+  return; // 使用 Hooks 模式，跳过备用检测
+}
+// 否则使用备用模式
+```
+
+**`checkHooksInstalled()` 逻辑**：
+1. 检查 `~/.claude/settings.json` 是否存在
+2. 检查是否有 `hooks.Stop` 配置
+3. **重要**：检查配置是否使用正确的脚本名 `peanut-hook-notify`
+4. 如果使用旧脚本名 `peanut-hook-notify`，返回 `false` 以启用备用模式
+
+### 开发时的注意事项
+
+1. **修改 relay-server 要极其谨慎**
+   - Cloudflare Durable Objects 的 WebSocket 状态管理很敏感
+   - 不要在 `acceptWebSocket()` 之前关闭连接
+   - 消息转发逻辑要简单，避免异步竞态
+
+2. **重命名后要更新所有引用**
+   - package.json 的 bin 命令
+   - hooks.ts 的 `getHookScriptPath()`
+   - `checkHooksInstalled()` 中的脚本名检查
+   - README、App 引导页的命令示例
+
+3. **测试消息同步问题时**
+   - 先检查端口占用
+   - 再检查 Hooks 配置
+   - 最后才考虑代码问题
+
+---
+
 ## 当前状态
 
 | 项目 | 内容 |
 |------|------|
-| **阶段** | Phase 3 开发 - Hooks 架构稳定 |
-| **进度** | v1.1.2 添加 Markdown 支持，优化文档 |
-| **上次决策** | 添加 iOS Markdown 渲染，更新安装指引 |
+| **阶段** | Phase 3 开发 - 性能优化完成 |
+| **进度** | v1.3.0 性能优化 + Bug 修复 |
+| **上次决策** | 优化消息列表性能，修复重复连接 Bug |
 
-### 最新完成 (2026-01-26)
+### 最新完成 (2026-01-27)
 
-**v1.1.2 功能优化**
-- ✅ **Markdown 渲染** - iOS 端支持 Markdown 格式（标题、列表、代码块、引用等）
-- ✅ **移除调试日志** - CLI 端移除 Hook 服务器相关的调试输出
-- ✅ **更新安装指引** - README 和 App 引导页添加 Hooks 安装步骤
+**v1.3.0 - 性能优化 & Bug 修复**
 
-**v1.1.1 Bug 修复**
-- ✅ **禁用备用模式** - 当 Hook 服务器运行时，禁用 fallbackStateDetection
-- ✅ **过滤思考状态词汇** - Moseying、Thinking 等不再作为消息显示
-- ✅ **过滤用户输入回显** - iOS 端过滤重复的用户消息（PTY 回显）
-- ✅ **简化思考指示器** - 移除中文文字，只保留脉冲点动画
-- ✅ **状态显示互斥** - CCThinkingIndicator 和 CCStatusOverlay 不再同时显示
+- ✅ **修复重复会话/WebSocket 连接 Bug**
+  - `ScanView.swift` - 扫码前检查是否已存在相同 ID 的会话，存在则更新而非新建
+  - `SessionDetailView.swift` - 添加 `hasConnected` 标志防止重复连接
+  - `WebSocketManager.swift` - 连接前检查是否已连接同一会话，断开时清理会话引用
 
-**v1.1.0 Hooks 架构升级（重大改进）**
-- ✅ **Hooks 集成** - 使用 Claude Code 官方 Hooks API
-- ✅ **Hook Server** - 本地 HTTP 服务器接收事件（端口 19789）
-- ✅ **Hook 脚本** - `cc-hook-notify` 被 Claude Code 调用
-- ✅ **CLI 命令** - `install-hooks`, `check-hooks` 配置管理
-- ✅ **状态同步** - ClaudeState 四种状态（idle/working/waiting_permission/waiting_input）
-- ✅ **iOS 适配** - WebSocketManager 支持新状态类型
-- ✅ **备用模式** - Hooks 未配置时使用简化的 PTY 解析
+- ✅ **消息列表性能优化**
+  - 历史消息跳过动画（`skipAnimation` 参数）
+  - 新消息动画时长从 0.3s 减少到 0.2s
+  - 移除 Claude 消息指示条的渐变和阴影效果
+  - 移除错误消息行的阴影效果
+  - 滚动动画从 0.25s 减少到 0.15s
 
-**架构优势**
-- 结构化 JSON 数据，不需要解析终端输出
-- 准确的状态识别（Stop 事件 = Claude 完成响应）
-- 可靠的权限请求检测（Notification + permission_prompt）
-- 官方支持，不受 Claude Code 更新影响
+- ✅ **智能滚动优化**
+  - 进入会话时自动滚动到底部（无动画）
+  - 历史消息首次加载完成后滚动到底部
+  - 只有新消息到达时才触发带动画的滚动
+  - 使用 `hasScrolledToBottom` 状态避免重复滚动
 
-### 之前完成 (2026-01-21)
+- ✅ **新 App 图标**
+  - 使用 lovlogo 生成的金属质感花生图标
+  - 尺寸 1024x1024，压缩至 358KB
 
-**设计系统 v2.0 重构**
-- ✅ 色彩系统、字体系统、间距系统、图标系统
-- ✅ 核心组件、消息组件、权限请求 Sheet
-- ✅ 页面重构（会话列表、会话详情、引导页）
+- ✅ **强制深色模式**
+  - `CCConnectApp.swift` 添加 `.preferredColorScheme(.dark)`
+  - 玻璃拟态效果在深色模式下表现更佳
 
-### 待完成
-- [ ] Hooks 配置安装流程测试
-- [ ] Hook 事件端到端测试
-- [ ] iOS 端状态显示验证
-- [ ] Xcode 编译验证
+### Design System v4.0 - Glassmorphism 玻璃拟态
+
+- ✅ **Colors.swift** - 深邃科技黑背景 + 玻璃效果色 + 发光色系统
+- ✅ **Glass View Modifiers** - `.glassBackground()`, `.glassCard()`, `.glowBorder()`
+- ✅ **MessageComponents.swift** - 玻璃消息组件 + 简化的出现动画
+- ✅ **Components.swift** - 玻璃核心组件（简化边框设计）
+- ✅ **SessionListView/DetailView** - 玻璃列表页和详情页
+
+### 之前版本
+
+**v1.2.x** - 品牌统一 (Peanut)、Hooks 兼容性修复、端口占用提示
+**v1.1.x** - Hooks 架构、Markdown 渲染、Bug 修复
+**v1.0.x** - 初始版本，PTY 解析模式
 
 ### 架构要点
 
 **CLI 端 Hooks 模式处理流程**
 ```
 Claude Code Hook 事件
-    ↓ cc-hook-notify 脚本
+    ↓ peanut-hook-notify 脚本
 HTTP POST → hooks.ts Hook Server
     ↓ processHookEvent()
 转换为 ProcessedEvent
@@ -676,11 +785,11 @@ npm publish --access public
 
 ### 当前版本
 
-- **包名**: huashu-cc
-- **最新版本**: 1.1.2
-- **安装命令**: `npm install -g huashu-cc@latest`
-- **首次配置**: `huashu-cc install-hooks`（必须）
-- **可执行文件**: `cc`, `huashu-cc`, `cc-hook-notify`
+- **包名**: peanut-cc
+- **最新版本**: 1.2.2
+- **安装命令**: `npm install -g peanut-cc@latest`
+- **首次配置**: `peanut install-hooks`（必须）
+- **可执行文件**: `peanut`, `peanut-hook-notify`
 
 ---
 

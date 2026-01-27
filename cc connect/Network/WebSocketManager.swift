@@ -266,6 +266,7 @@ class WebSocketManager: NSObject, ObservableObject {
     @Published var statusBarText: String? = nil          // 状态栏文本（如 Thinking...）
     @Published var isThinking: Bool = false              // Claude 是否正在思考
     @Published var claudeState: ClaudeState = .idle      // Claude 工作状态（基于 Hooks）
+    @Published var initialMessageCount: Int = 0          // 初始加载的历史消息数量
 
     /// 兼容旧属性名
     var currentQuestion: CCMessage? {
@@ -292,6 +293,18 @@ class WebSocketManager: NSObject, ObservableObject {
 
     /// 连接到中继服务器
     func connect(serverURL: String, sessionId: String, secret: String, session: Session? = nil) {
+        // 如果已经连接到同一个会话，不重复连接
+        if self.sessionId == sessionId && (connectionState == .connected || connectionState == .connecting) {
+            print("⚠️ WebSocketManager: 已连接到会话 \(sessionId)，跳过重复连接")
+            return
+        }
+
+        // 如果正在连接其他会话，先断开
+        if webSocket != nil {
+            print("⚠️ WebSocketManager: 断开现有连接后重新连接")
+            disconnect()
+        }
+
         self.serverURL = serverURL
         self.sessionId = sessionId
         self.secret = secret
@@ -316,13 +329,17 @@ class WebSocketManager: NSObject, ObservableObject {
 
         // 将 SwiftData Message 转换为 CCMessage
         let sortedMessages = session.messages.sorted { $0.timestamp < $1.timestamp }
-        messages = sortedMessages.map { msg in
+        let loadedMessages = sortedMessages.map { msg in
             CCMessage(
                 type: ccMessageType(from: msg.type),
                 content: msg.content,
                 timestamp: Int64(msg.timestamp.timeIntervalSince1970 * 1000)
             )
         }
+
+        // 批量更新，减少 UI 刷新次数
+        messages = loadedMessages
+        initialMessageCount = loadedMessages.count
         print("📚 加载了 \(messages.count) 条历史消息")
     }
 
@@ -485,11 +502,15 @@ class WebSocketManager: NSObject, ObservableObject {
 
     /// 断开连接
     func disconnect() {
+        print("🔌 WebSocketManager: 断开连接 (session: \(sessionId))")
         stopPingTimer()
         webSocket?.cancel(with: .goingAway, reason: nil)
         webSocket = nil
+        urlSession?.invalidateAndCancel()
         urlSession = nil
         connectionState = .disconnected
+        // 清除会话引用
+        session = nil
     }
 
     /// 清空消息

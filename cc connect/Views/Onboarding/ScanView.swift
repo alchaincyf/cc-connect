@@ -126,23 +126,49 @@ struct ScanView: View {
         isConnecting = true
         errorMessage = nil
 
-        // 创建 Session 并连接
-        // 使用配对码中的会话名称（来自工作目录名），如果没有则用默认值
-        let sessionName = pairingInfo.sessionName ?? "新会话"
-        let session = Session(
-            id: pairingInfo.sessionId,
-            name: sessionName,
-            status: .idle,
-            lastActivity: Date(),
-            isConnected: true,
-            deviceName: "MacBook Pro"
+        // 查找是否已存在相同 ID 的会话
+        let sessionId = pairingInfo.sessionId
+        let descriptor = FetchDescriptor<Session>(
+            predicate: #Predicate { $0.id == sessionId }
         )
 
-        // 保存配对信息供后续 WebSocket 连接使用
-        session.secret = pairingInfo.secret
+        let existingSession: Session?
+        do {
+            existingSession = try modelContext.fetch(descriptor).first
+        } catch {
+            print("⚠️ 查询会话失败: \(error)")
+            existingSession = nil
+        }
 
-        // 保存到 SwiftData
-        modelContext.insert(session)
+        let session: Session
+        if let existing = existingSession {
+            // 更新现有会话
+            print("📝 更新现有会话: \(existing.id)")
+            existing.name = pairingInfo.sessionName ?? existing.name
+            existing.secret = pairingInfo.secret
+            existing.status = .idle
+            existing.lastActivity = Date()
+            existing.isConnected = true
+            session = existing
+        } else {
+            // 创建新会话
+            let sessionName = pairingInfo.sessionName ?? "新会话"
+            let newSession = Session(
+                id: pairingInfo.sessionId,
+                name: sessionName,
+                status: .idle,
+                lastActivity: Date(),
+                isConnected: true,
+                deviceName: "MacBook Pro"
+            )
+            newSession.secret = pairingInfo.secret
+            modelContext.insert(newSession)
+            print("📝 创建新会话: \(newSession.id)")
+            session = newSession
+        }
+
+        // 保存更改
+        try? modelContext.save()
 
         isConnecting = false
 

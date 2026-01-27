@@ -2,8 +2,8 @@
 //  SessionDetailView.swift
 //  cc connect
 //
-//  Design System v3.0 - MUJI 风格会话详情页
-//  极简消息展示 + 思考状态指示器 + 权限请求 Sheet
+//  Design System v4.0 - Glassmorphism 玻璃拟态会话详情页
+//  玻璃消息展示 + 思考状态指示器 + 权限请求 Sheet
 //
 
 import SwiftUI
@@ -18,19 +18,33 @@ struct SessionDetailView: View {
     @State private var showSelectionSheet = false
     @State private var pendingPermission: CCMessage?
     @State private var pendingSelection: CCMessage?
+    @State private var scrollTrigger = false  // 触发滚动到底部
+    @State private var hasConnected = false   // 防止重复连接
 
     @FocusState private var isInputFocused: Bool
 
     var body: some View {
         ZStack(alignment: .bottom) {
-            // 背景色
+            // 深邃背景
             CCColor.bgPrimary.ignoresSafeArea()
+
+            // 背景装饰光晕
+            GeometryReader { geo in
+                Circle()
+                    .fill(CCColor.accentClaude.opacity(0.05))
+                    .frame(width: geo.size.width * 0.5)
+                    .blur(radius: 60)
+                    .offset(x: geo.size.width * 0.6, y: geo.size.height * 0.1)
+            }
+            .ignoresSafeArea()
 
             VStack(spacing: 0) {
                 // 消息列表
                 CCMessageList(
                     messages: wsManager.messages,
-                    onTap: dismissKeyboard
+                    onTap: dismissKeyboard,
+                    scrollToBottomTrigger: scrollTrigger,
+                    initialMessageCount: wsManager.initialMessageCount
                 )
 
                 // 思考状态指示器 - 仅当思考但没有具体状态文字时显示
@@ -87,7 +101,17 @@ struct SessionDetailView: View {
             connectWebSocket()
         }
         .onDisappear {
+            print("🔴 SessionDetailView 消失，断开连接")
             wsManager.disconnect()
+            hasConnected = false
+        }
+        .onChange(of: isInputFocused) { _, isFocused in
+            // 键盘弹出时滚动到底部
+            if isFocused {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                    scrollTrigger.toggle()
+                }
+            }
         }
         .onChange(of: wsManager.currentInteraction) { _, newValue in
             guard let interaction = newValue else { return }
@@ -146,7 +170,19 @@ struct SessionDetailView: View {
     }
 
     private func connectWebSocket() {
-        guard let secret = session.secret else { return }
+        // 防止重复连接
+        guard !hasConnected else {
+            print("⚠️ 已连接，跳过重复连接")
+            return
+        }
+        guard let secret = session.secret else {
+            print("⚠️ 无 secret，无法连接")
+            return
+        }
+
+        hasConnected = true
+        print("🔵 SessionDetailView 连接 WebSocket: \(session.id)")
+
         wsManager.connect(
             serverURL: ServerConfig.relayServer,
             sessionId: session.id,

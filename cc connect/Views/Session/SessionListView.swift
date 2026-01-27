@@ -2,7 +2,7 @@
 //  SessionListView.swift
 //  cc connect
 //
-//  Design System v3.0 - MUJI 风格会话列表页
+//  Design System v4.0 - Glassmorphism 玻璃拟态会话列表页
 //
 
 import SwiftUI
@@ -32,8 +32,24 @@ struct SessionListView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                // 背景色
+                // 深邃背景
                 CCColor.bgPrimary.ignoresSafeArea()
+
+                // 背景装饰 - 渐变光晕
+                GeometryReader { geo in
+                    Circle()
+                        .fill(CCColor.accentPrimary.opacity(0.08))
+                        .frame(width: geo.size.width * 0.8)
+                        .blur(radius: 80)
+                        .offset(x: -geo.size.width * 0.3, y: -geo.size.height * 0.2)
+
+                    Circle()
+                        .fill(CCColor.accentClaude.opacity(0.05))
+                        .frame(width: geo.size.width * 0.6)
+                        .blur(radius: 60)
+                        .offset(x: geo.size.width * 0.5, y: geo.size.height * 0.6)
+                }
+                .ignoresSafeArea()
 
                 if sessions.isEmpty {
                     EmptyStateView(onScan: { showScanView = true })
@@ -43,7 +59,7 @@ struct SessionListView: View {
             }
             .navigationTitle("Peanut")
             .navigationBarTitleDisplayMode(.large)
-            .toolbarBackground(CCColor.bgPrimary, for: .navigationBar)
+            .toolbarBackground(CCColor.bgPrimary.opacity(0.8), for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     NavigationLink {
@@ -51,6 +67,8 @@ struct SessionListView: View {
                     } label: {
                         Image(systemName: CCIcon.settings)
                             .foregroundColor(CCColor.textPrimary)
+                            .frame(width: 36, height: 36)
+                            .glassBackground(cornerRadius: CCRadius.sm)
                     }
                 }
             }
@@ -146,23 +164,44 @@ struct SessionListView: View {
 
 // MARK: - Empty State View
 
-/// 空状态 - MUJI 风格：极简文字，大量留白
+/// 空状态 - 玻璃拟态风格
 struct EmptyStateView: View {
     let onScan: () -> Void
+    @State private var isVisible = false
 
     var body: some View {
         VStack(spacing: CCSpacing.xxxl) {
             Spacer()
 
-            // 文字 - 无图标，纯文字
-            VStack(spacing: CCSpacing.md) {
-                Text("尚无连接")
-                    .font(.ccBody)
-                    .foregroundColor(CCColor.textPrimary)
+            // Logo + 文字
+            VStack(spacing: CCSpacing.lg) {
+                // 发光图标
+                ZStack {
+                    Circle()
+                        .fill(CCColor.accentClaude.opacity(0.15))
+                        .frame(width: 80, height: 80)
+                        .blur(radius: 20)
 
-                Text("扫码连接你的 Mac")
-                    .font(.ccCaption)
-                    .foregroundColor(CCColor.textTertiary)
+                    Image(systemName: "sparkles")
+                        .font(.system(size: 32, weight: .light))
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [CCColor.accentClaude, CCColor.accentPrimary],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                }
+
+                VStack(spacing: CCSpacing.sm) {
+                    Text("尚无连接")
+                        .font(.ccHeadline)
+                        .foregroundColor(CCColor.textPrimary)
+
+                    Text("扫码连接你的 Mac")
+                        .font(.ccBody)
+                        .foregroundColor(CCColor.textSecondary)
+                }
             }
 
             // 按钮
@@ -176,32 +215,47 @@ struct EmptyStateView: View {
             Spacer()
         }
         .padding(CCSpacing.xl)
+        .opacity(isVisible ? 1 : 0)
+        .offset(y: isVisible ? 0 : 20)
+        .onAppear {
+            withAnimation(.easeOut(duration: 0.5)) {
+                isVisible = true
+            }
+        }
     }
 }
 
 // MARK: - Section Header
 
-/// 区域头部 - MUJI 风格：极简，无图标
+/// 区域头部 - 玻璃拟态：带图标
 struct SectionHeaderView: View {
     let title: String
-    let icon: String  // 保留参数但不使用
+    let icon: String
 
     var body: some View {
-        Text(title)
-            .font(.ccCaption)
-            .foregroundColor(CCColor.textTertiary)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, CCSpacing.xs)
-            .padding(.vertical, CCSpacing.xs)
+        HStack(spacing: CCSpacing.sm) {
+            Image(systemName: icon)
+                .font(.system(size: 12))
+                .foregroundColor(CCColor.textTertiary)
+
+            Text(title)
+                .font(.ccCaption)
+                .foregroundColor(CCColor.textTertiary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, CCSpacing.xs)
+        .padding(.vertical, CCSpacing.xs)
     }
 }
 
 // MARK: - Session Card
 
-/// 会话卡片 - MUJI 风格：极简，大留白
+/// 会话卡片 - 玻璃拟态：发光状态指示 + 玻璃背景
 struct CCSessionCard: View {
     let session: Session
     let onTap: () -> Void
+
+    @State private var isPressed = false
 
     var body: some View {
         Button(action: {
@@ -209,46 +263,72 @@ struct CCSessionCard: View {
             onTap()
         }) {
             HStack(spacing: CCSpacing.md) {
-                // 左侧状态指示线
-                Rectangle()
-                    .fill(CCColor.statusColor(for: session.status))
+                // 左侧发光状态指示线
+                RoundedRectangle(cornerRadius: 2)
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                CCColor.statusColor(for: session.status),
+                                CCColor.statusColor(for: session.status).opacity(0.5)
+                            ],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                    )
                     .frame(width: 3)
-                    .clipShape(RoundedRectangle(cornerRadius: 1.5))
+                    .shadow(color: CCColor.statusGlowColor(for: session.status), radius: 6, x: 0, y: 0)
 
                 // 内容
                 VStack(alignment: .leading, spacing: CCSpacing.xs) {
                     // 名称
                     Text(session.name)
-                        .font(.ccBody)
+                        .font(.ccHeadline)
                         .foregroundColor(CCColor.textPrimary)
 
                     // 状态 + 时间
-                    Text("\(session.status.displayText) · \(session.lastActivity.timeAgo)")
-                        .font(.ccCaption)
-                        .foregroundColor(CCColor.textTertiary)
+                    HStack(spacing: CCSpacing.xs) {
+                        Text(session.status.displayText)
+                            .foregroundColor(CCColor.statusColor(for: session.status))
+                        Text("·")
+                            .foregroundColor(CCColor.textTertiary)
+                        Text(session.lastActivity.timeAgo)
+                            .foregroundColor(CCColor.textTertiary)
+                    }
+                    .font(.ccCaption)
                 }
 
                 Spacer()
 
-                // 需要输入时显示小圆点
+                // 需要输入时显示脉冲圆点
                 if session.status == .waiting {
-                    Circle()
-                        .fill(CCColor.accentWarning)
-                        .frame(width: 8, height: 8)
+                    CCStatusIndicator(status: .waiting, size: 10)
                 }
+
+                // 箭头
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(CCColor.textTertiary)
             }
             .padding(.vertical, CCSpacing.md)
             .padding(.horizontal, CCSpacing.lg)
+            .glassBackground(cornerRadius: CCRadius.lg)
+            .scaleEffect(isPressed ? 0.98 : 1.0)
         }
         .buttonStyle(.plain)
+        .onLongPressGesture(minimumDuration: .infinity, pressing: { pressing in
+            withAnimation(.easeInOut(duration: 0.15)) {
+                isPressed = pressing
+            }
+        }, perform: {})
     }
 }
 
 // MARK: - Scan Button (顶部主按钮)
 
-/// 扫码按钮 - MUJI 风格：简洁但明显的主操作入口
+/// 扫码按钮 - 玻璃拟态：发光边框 + 渐变高光
 struct ScanButton: View {
     let action: () -> Void
+    @State private var isPressed = false
 
     var body: some View {
         Button(action: {
@@ -256,23 +336,39 @@ struct ScanButton: View {
             action()
         }) {
             HStack(spacing: CCSpacing.md) {
-                Image(systemName: CCIcon.scan)
-                    .font(.system(size: 20))
+                // 发光图标
+                ZStack {
+                    Circle()
+                        .fill(CCColor.accentPrimary.opacity(0.2))
+                        .frame(width: 36, height: 36)
+
+                    Image(systemName: CCIcon.scan)
+                        .font(.system(size: 18, weight: .medium))
+                        .foregroundColor(CCColor.accentPrimary)
+                }
 
                 Text("扫码连接")
                     .font(.ccHeadline)
+                    .foregroundColor(CCColor.textPrimary)
+
+                Spacer()
+
+                Image(systemName: "arrow.right")
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundColor(CCColor.textTertiary)
             }
-            .foregroundColor(CCColor.textPrimary)
+            .padding(.horizontal, CCSpacing.lg)
             .frame(maxWidth: .infinity)
-            .frame(height: CCSize.buttonHeight)
-            .background(CCColor.bgSecondary)
-            .clipShape(RoundedRectangle(cornerRadius: CCRadius.md))
-            .overlay(
-                RoundedRectangle(cornerRadius: CCRadius.md)
-                    .stroke(CCColor.borderDefault, lineWidth: 1)
-            )
+            .frame(height: 60)
+            .glassCard(cornerRadius: CCRadius.lg)
+            .scaleEffect(isPressed ? 0.98 : 1.0)
         }
         .buttonStyle(.plain)
+        .onLongPressGesture(minimumDuration: .infinity, pressing: { pressing in
+            withAnimation(.easeInOut(duration: 0.15)) {
+                isPressed = pressing
+            }
+        }, perform: {})
     }
 }
 

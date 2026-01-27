@@ -2,7 +2,7 @@
 //  Spacing.swift
 //  cc connect
 //
-//  Design System v3.0 - MUJI 风格间距系统
+//  Design System v4.0 - Glassmorphism 玻璃拟态间距系统
 //  更大的留白，更多呼吸感
 //
 

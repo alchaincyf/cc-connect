@@ -14,6 +14,7 @@ struct CCConnectApp: App {
         WindowGroup {
             RootView()
                 .environment(AppState.shared)
+                .preferredColorScheme(.dark)  // 强制深色模式，玻璃拟态效果更佳
         }
         .modelContainer(for: [Session.self, Message.self])
     }
@@ -54,19 +55,66 @@ struct RootView: View {
 
 // MARK: - Launch Screen
 struct LaunchScreenView: View {
+    @State private var isAnimating = false
+
     var body: some View {
         ZStack {
-            Color.ccBackground
+            // 深邃背景
+            CCColor.bgPrimary
                 .ignoresSafeArea()
 
-            VStack(spacing: 16) {
-                Image(systemName: "antenna.radiowaves.left.and.right")
-                    .font(.system(size: 48))
-                    .foregroundColor(.ccPrimary)
+            // 背景光晕
+            Circle()
+                .fill(CCColor.accentClaude.opacity(0.1))
+                .frame(width: 300, height: 300)
+                .blur(radius: 80)
+                .offset(y: -50)
+
+            Circle()
+                .fill(CCColor.accentPrimary.opacity(0.08))
+                .frame(width: 200, height: 200)
+                .blur(radius: 60)
+                .offset(x: 80, y: 100)
+
+            // Logo
+            VStack(spacing: CCSpacing.lg) {
+                ZStack {
+                    // 发光层
+                    Circle()
+                        .fill(CCColor.accentClaude.opacity(0.2))
+                        .frame(width: 80, height: 80)
+                        .blur(radius: 20)
+                        .scaleEffect(isAnimating ? 1.2 : 0.8)
+                        .opacity(isAnimating ? 0.6 : 0.3)
+
+                    Image(systemName: "sparkles")
+                        .font(.system(size: 40, weight: .light))
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [CCColor.accentClaude, CCColor.accentPrimary],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                }
 
                 Text("Peanut")
-                    .font(.title2.weight(.semibold))
-                    .foregroundColor(.ccTextPrimary)
+                    .font(.system(size: 28, weight: .semibold, design: .rounded))
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [CCColor.textPrimary, CCColor.textSecondary],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
+            }
+        }
+        .onAppear {
+            withAnimation(
+                .easeInOut(duration: 1.5)
+                .repeatForever(autoreverses: true)
+            ) {
+                isAnimating = true
             }
         }
     }

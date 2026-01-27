@@ -2,8 +2,8 @@
 //  Colors.swift
 //  cc connect
 //
-//  Design System v3.0 - MUJI 风格色彩系统
-//  极简、自然、克制的色彩体验
+//  Design System v4.0 - Glassmorphism 玻璃拟态设计
+//  科技感、层次感、现代感
 //
 
 import SwiftUI
@@ -11,121 +11,153 @@ import UIKit
 
 // MARK: - Design Tokens
 
-/// CC Connect 设计系统色彩 - MUJI 风格
+/// Peanut 设计系统色彩 - Glassmorphism 风格
 enum CCColor {
 
-    // MARK: - Background Colors (背景色 - 纯净、呼吸感)
+    // MARK: - Background Colors (深色玻璃背景)
 
-    /// 主背景色 - 页面背景
-    /// Dark: #121212 (近黑), Light: #FAFAFA (米白)
-    static let bgPrimary = Color.adaptive(dark: "121212", light: "FAFAFA")
+    /// 主背景色 - 深邃的科技黑
+    /// Dark: #0A0A0F (近纯黑), Light: #F0F2F5 (冷灰白)
+    static let bgPrimary = Color.adaptive(dark: "0A0A0F", light: "F0F2F5")
 
-    /// 次级背景色 - 卡片背景
-    /// Dark: #1A1A1A, Light: #FFFFFF
-    static let bgSecondary = Color.adaptive(dark: "1A1A1A", light: "FFFFFF")
+    /// 次级背景色 - 玻璃卡片底色
+    /// Dark: #12121A, Light: #FFFFFF
+    static let bgSecondary = Color.adaptive(dark: "12121A", light: "FFFFFF")
 
     /// 三级背景色 - 输入框、次级容器
-    /// Dark: #242424, Light: #F5F5F5
-    static let bgTertiary = Color.adaptive(dark: "242424", light: "F5F5F5")
+    /// Dark: #1A1A24, Light: #F5F6F8")
+    static let bgTertiary = Color.adaptive(dark: "1A1A24", light: "F5F6F8")
 
     /// 浮层背景色 - 弹窗、Sheet
-    /// Dark: #2A2A2A, Light: #FFFFFF
-    static let bgElevated = Color.adaptive(dark: "2A2A2A", light: "FFFFFF")
+    /// Dark: #1E1E28, Light: #FFFFFF
+    static let bgElevated = Color.adaptive(dark: "1E1E28", light: "FFFFFF")
 
-    // MARK: - Border Colors (边框色 - 细腻、低调)
+    // MARK: - Glass Effect Colors (玻璃效果专用)
 
-    /// 默认边框
-    /// Dark: #333333, Light: #E8E8E8
-    static let borderDefault = Color.adaptive(dark: "333333", light: "E8E8E8")
+    /// 玻璃背景 - 半透明白
+    static let glassBg = Color.white.opacity(0.08)
+
+    /// 玻璃背景（浅色模式）
+    static let glassBgLight = Color.white.opacity(0.7)
+
+    /// 玻璃边框 - 亮边效果
+    static let glassBorder = Color.white.opacity(0.12)
+
+    /// 玻璃高光 - 顶部亮线
+    static let glassHighlight = Color.white.opacity(0.15)
+
+    /// 玻璃阴影
+    static let glassShadow = Color.black.opacity(0.3)
+
+    // MARK: - Border Colors (边框色 - 微光效果)
+
+    /// 默认边框 - 微弱发光感
+    /// Dark: rgba(255,255,255,0.1), Light: #E2E4E8
+    static let borderDefault = Color.adaptive(dark: "FFFFFF", light: "E2E4E8").opacity(0.1)
 
     /// 弱化边框
-    /// Dark: #2A2A2A, Light: #EEEEEE
-    static let borderMuted = Color.adaptive(dark: "2A2A2A", light: "EEEEEE")
+    static let borderMuted = Color.adaptive(dark: "FFFFFF", light: "EEEEEE").opacity(0.06)
 
-    // MARK: - Text Colors (文字色 - 舒适对比度)
+    /// 发光边框 - 用于选中状态
+    static let borderGlow = Color.adaptive(dark: "007AFF", light: "007AFF")
 
-    /// 主要文字
-    /// Dark: #E0E0E0, Light: #1A1A1A
-    static let textPrimary = Color.adaptive(dark: "E0E0E0", light: "1A1A1A")
+    // MARK: - Text Colors (文字色 - 高对比度)
+
+    /// 主要文字 - 纯净白/深黑
+    /// Dark: #F8FAFC, Light: #0F172A
+    static let textPrimary = Color.adaptive(dark: "F8FAFC", light: "0F172A")
 
     /// 次要文字
-    /// Dark: #888888, Light: #666666
-    static let textSecondary = Color.adaptive(dark: "888888", light: "666666")
+    /// Dark: #94A3B8, Light: #475569
+    static let textSecondary = Color.adaptive(dark: "94A3B8", light: "475569")
 
     /// 辅助文字
-    /// Dark: #666666, Light: #999999
-    static let textTertiary = Color.adaptive(dark: "666666", light: "999999")
+    /// Dark: #64748B, Light: #64748B
+    static let textTertiary = Color.adaptive(dark: "64748B", light: "64748B")
 
     /// 禁用文字
-    /// Dark: #4A4A4A, Light: #BBBBBB
-    static let textDisabled = Color.adaptive(dark: "4A4A4A", light: "BBBBBB")
+    /// Dark: #475569, Light: #CBD5E1
+    static let textDisabled = Color.adaptive(dark: "475569", light: "CBD5E1")
 
-    /// 链接文字 - 保持低调的蓝
-    /// Dark: #7AA2D4, Light: #5A7DAF
-    static let textLink = Color.adaptive(dark: "7AA2D4", light: "5A7DAF")
+    /// 链接文字 - 电光蓝
+    static let textLink = Color.adaptive(dark: "60A5FA", light: "2563EB")
 
-    // MARK: - Accent Colors (强调色 - 自然、温暖)
+    // MARK: - Accent Colors (强调色 - 科技感)
 
-    /// Claude 品牌色 - 淡木色/深木色（MUJI 核心色）
-    static let accentClaude = Color.adaptive(dark: "D4A574", light: "8B7355")
+    /// 主强调色 - 电光蓝（Apple 风格）
+    static let accentPrimary = Color.adaptive(dark: "007AFF", light: "007AFF")
 
-    /// 主强调色 - 与 Claude 品牌色一致
-    static let accentPrimary = Color.adaptive(dark: "D4A574", light: "8B7355")
+    /// Claude/AI 品牌色 - 渐变青蓝
+    static let accentClaude = Color.adaptive(dark: "00D4AA", light: "00B894")
 
-    /// 成功色 - 柔和绿
-    static let accentSuccess = Color.adaptive(dark: "7CAE7A", light: "5D8A5B")
+    /// 成功色 - 霓虹绿
+    static let accentSuccess = Color.adaptive(dark: "10B981", light: "059669")
 
-    /// 警告色 - 温暖橙（更柔和）
-    static let accentWarning = Color.adaptive(dark: "D4A06A", light: "B8895A")
+    /// 警告色 - 琥珀橙
+    static let accentWarning = Color.adaptive(dark: "F59E0B", light: "D97706")
 
-    /// 危险色 - 柔和红
-    static let accentDanger = Color.adaptive(dark: "C27070", light: "A85A5A")
+    /// 危险色 - 玫红
+    static let accentDanger = Color.adaptive(dark: "EF4444", light: "DC2626")
 
-    /// 信息色 - 柔和蓝
-    static let accentInfo = Color.adaptive(dark: "7AA2D4", light: "5A7DAF")
+    /// 信息色 - 电光蓝
+    static let accentInfo = Color.adaptive(dark: "3B82F6", light: "2563EB")
 
-    // MARK: - Terminal Colors (终端色 - 柔和、不刺眼)
+    // MARK: - Glow Colors (发光效果)
 
-    /// 终端背景 - 与主背景深色一致
-    static let terminalBg = Color(hex: "121212")
+    /// 主强调色发光
+    static let glowPrimary = Color(hex: "007AFF").opacity(0.4)
 
-    /// 终端默认文字 - 柔和灰白
-    static let terminalText = Color(hex: "D0D0D0")
+    /// Claude 色发光
+    static let glowClaude = Color(hex: "00D4AA").opacity(0.4)
+
+    /// 成功色发光
+    static let glowSuccess = Color(hex: "10B981").opacity(0.4)
+
+    /// 警告色发光
+    static let glowWarning = Color(hex: "F59E0B").opacity(0.4)
+
+    // MARK: - Terminal Colors (终端色 - 高对比度)
+
+    /// 终端背景
+    static let terminalBg = Color(hex: "0A0A0F")
+
+    /// 终端默认文字
+    static let terminalText = Color(hex: "E2E8F0")
 
     /// 终端注释/行号
-    static let terminalComment = Color(hex: "777777")
+    static let terminalComment = Color(hex: "64748B")
 
-    /// 终端关键字 - 柔和红
-    static let terminalKeyword = Color(hex: "D4A574")
+    /// 终端关键字 - 粉紫
+    static let terminalKeyword = Color(hex: "F472B6")
 
-    /// 终端字符串 - 柔和蓝
-    static let terminalString = Color(hex: "9DC3E6")
+    /// 终端字符串 - 青绿
+    static let terminalString = Color(hex: "34D399")
 
-    /// 终端数字 - 柔和青
-    static let terminalNumber = Color(hex: "8FC4BC")
+    /// 终端数字 - 橙色
+    static let terminalNumber = Color(hex: "FB923C")
 
-    /// 终端函数名 - 柔和紫
-    static let terminalFunction = Color(hex: "C9A8D4")
+    /// 终端函数名 - 蓝色
+    static let terminalFunction = Color(hex: "60A5FA")
 
-    /// 终端变量 - 柔和橙
-    static let terminalVariable = Color(hex: "D4B896")
+    /// 终端变量 - 紫色
+    static let terminalVariable = Color(hex: "A78BFA")
 
-    /// 终端类型 - 柔和绿
-    static let terminalType = Color(hex: "A8C9A8")
+    /// 终端类型 - 黄色
+    static let terminalType = Color(hex: "FBBF24")
 
-    // MARK: - Semantic Colors (语义色背景 - 极低透明度)
+    // MARK: - Semantic Colors (语义色背景)
 
-    /// 成功背景（10%透明度 - 更克制）
-    static let successBg = Color.adaptive(dark: "7CAE7A", light: "5D8A5B").opacity(0.10)
+    /// 成功背景
+    static let successBg = Color(hex: "10B981").opacity(0.15)
 
-    /// 警告背景（10%透明度）
-    static let warningBg = Color.adaptive(dark: "D4A06A", light: "B8895A").opacity(0.10)
+    /// 警告背景
+    static let warningBg = Color(hex: "F59E0B").opacity(0.15)
 
-    /// 错误背景（10%透明度）
-    static let dangerBg = Color.adaptive(dark: "C27070", light: "A85A5A").opacity(0.10)
+    /// 错误背景
+    static let dangerBg = Color(hex: "EF4444").opacity(0.15)
 
-    /// 信息背景（10%透明度）
-    static let infoBg = Color.adaptive(dark: "7AA2D4", light: "5A7DAF").opacity(0.10)
+    /// 信息背景
+    static let infoBg = Color(hex: "3B82F6").opacity(0.15)
 
     // MARK: - Status Colors
 
@@ -137,7 +169,7 @@ enum CCColor {
         case .waiting:
             return accentWarning
         case .idle:
-            return textTertiary
+            return accentClaude
         case .error:
             return accentDanger
         case .disconnected:
@@ -145,27 +177,26 @@ enum CCColor {
         }
     }
 
-    /// 获取状态对应的背景色
-    static func statusBgColor(for status: SessionStatus) -> Color {
+    /// 获取状态发光色
+    static func statusGlowColor(for status: SessionStatus) -> Color {
         switch status {
         case .running:
-            return accentSuccess.opacity(0.2)
+            return glowSuccess
         case .waiting:
-            return accentWarning.opacity(0.2)
+            return glowWarning
         case .idle:
-            return textTertiary.opacity(0.2)
+            return glowClaude
         case .error:
-            return accentDanger.opacity(0.2)
+            return Color(hex: "EF4444").opacity(0.4)
         case .disconnected:
-            return textDisabled.opacity(0.2)
+            return Color.clear
         }
     }
 }
 
-// MARK: - Legacy Compatibility (过渡期兼容)
+// MARK: - Legacy Compatibility
 
 extension Color {
-    // 旧 API 映射到新系统，方便渐进式迁移
     static let ccPrimary = CCColor.accentPrimary
     static let ccPrimaryVariant = CCColor.accentPrimary
     static let ccSuccess = CCColor.accentSuccess
@@ -184,10 +215,10 @@ extension Color {
 
     static let ccTerminalBG = CCColor.terminalBg
     static let ccTerminalText = CCColor.terminalText
-    static let ccTerminalGreen = CCColor.terminalType
-    static let ccTerminalYellow = CCColor.terminalVariable
+    static let ccTerminalGreen = CCColor.terminalString
+    static let ccTerminalYellow = CCColor.terminalType
     static let ccTerminalRed = CCColor.terminalKeyword
-    static let ccTerminalBlue = CCColor.terminalNumber
+    static let ccTerminalBlue = CCColor.terminalFunction
 }
 
 // MARK: - Hex Color Extension
@@ -199,11 +230,11 @@ extension Color {
         Scanner(string: hex).scanHexInt64(&int)
         let a, r, g, b: UInt64
         switch hex.count {
-        case 3: // RGB (12-bit)
+        case 3:
             (a, r, g, b) = (255, (int >> 8) * 17, (int >> 4 & 0xF) * 17, (int & 0xF) * 17)
-        case 6: // RGB (24-bit)
+        case 6:
             (a, r, g, b) = (255, int >> 16, int >> 8 & 0xFF, int & 0xFF)
-        case 8: // ARGB (32-bit)
+        case 8:
             (a, r, g, b) = (int >> 24, int >> 16 & 0xFF, int >> 8 & 0xFF, int & 0xFF)
         default:
             (a, r, g, b) = (255, 0, 0, 0)
@@ -253,5 +284,67 @@ extension Color {
                 ? UIColor(hex: dark)
                 : UIColor(hex: light)
         })
+    }
+}
+
+// MARK: - Glass Effect Modifiers
+
+extension View {
+    /// 玻璃拟态背景效果
+    func glassBackground(
+        cornerRadius: CGFloat = CCRadius.lg,
+        blur: CGFloat = 20,
+        opacity: CGFloat = 0.08,
+        showBorder: Bool = false  // 默认不显示边框，更简洁
+    ) -> some View {
+        self
+            .background(
+                RoundedRectangle(cornerRadius: cornerRadius)
+                    .fill(.ultraThinMaterial)
+                    .opacity(0.8)
+            )
+            .background(
+                RoundedRectangle(cornerRadius: cornerRadius)
+                    .fill(Color.white.opacity(opacity))
+            )
+            .overlay(
+                showBorder ?
+                RoundedRectangle(cornerRadius: cornerRadius)
+                    .stroke(CCColor.glassBorder, lineWidth: 0.5) : nil
+            )
+    }
+
+    /// 玻璃卡片效果（带阴影，无边框）
+    func glassCard(cornerRadius: CGFloat = CCRadius.lg) -> some View {
+        self
+            .background(
+                RoundedRectangle(cornerRadius: cornerRadius)
+                    .fill(.ultraThinMaterial)
+            )
+            .background(
+                RoundedRectangle(cornerRadius: cornerRadius)
+                    .fill(CCColor.glassBg)
+            )
+            .shadow(color: CCColor.glassShadow.opacity(0.3), radius: 12, x: 0, y: 4)
+    }
+
+    /// 发光边框效果
+    func glowBorder(color: Color, radius: CGFloat = CCRadius.md) -> some View {
+        self
+            .overlay(
+                RoundedRectangle(cornerRadius: radius)
+                    .stroke(color.opacity(0.5), lineWidth: 1)
+            )
+            .shadow(color: color.opacity(0.3), radius: 8, x: 0, y: 0)
+    }
+
+    /// 内发光效果
+    func innerGlow(color: Color, radius: CGFloat = 10) -> some View {
+        self
+            .overlay(
+                RoundedRectangle(cornerRadius: CCRadius.md)
+                    .stroke(color.opacity(0.3), lineWidth: 2)
+                    .blur(radius: 4)
+            )
     }
 }
