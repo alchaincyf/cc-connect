@@ -13,7 +13,7 @@ program
 program
     .command('start')
     .description('启动 Claude Code 并生成配对二维码')
-    .option('-n, --name <name>', '会话名称', '新会话')
+    .option('-n, --name <name>', '会话名称（默认使用当前目录名）')
     .option('-s, --server <url>', '中继服务器地址', 'wss://cc-connect.alchaincyf.workers.dev')
     .option('-p, --port <port>', 'Hook 服务器端口（多会话时使用不同端口）', '19789')
     .action(async (options) => {

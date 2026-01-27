@@ -96,7 +96,8 @@ function isDuplicate(content, type) {
 // 会话启动
 // ============================================================================
 async function startSession(options) {
-    state.name = options.name;
+    // 使用用户指定的名称，否则使用当前目录名
+    state.name = options.name || getDefaultSessionName();
     // 检查 Hooks 是否已配置
     const hooksInstalled = (0, hooks_1.checkHooksInstalled)();
     if (!hooksInstalled) {

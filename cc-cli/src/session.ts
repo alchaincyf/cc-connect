@@ -89,7 +89,8 @@ function isDuplicate(content: string, type: string): boolean {
 // ============================================================================
 
 export async function startSession(options: SessionOptions): Promise<void> {
-  state.name = options.name;
+  // 使用用户指定的名称，否则使用当前目录名
+  state.name = options.name || getDefaultSessionName();
 
   // 检查 Hooks 是否已配置
   const hooksInstalled = checkHooksInstalled();

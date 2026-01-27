@@ -1,6 +1,6 @@
 {
   "name": "peanut-cc",
-  "version": "1.2.5",
+  "version": "1.2.6",
   "description": "Peanut - Claude Code 移动控制台，在手机上远程控制 Claude Code",
   "main": "dist/index.js",
   "bin": {
