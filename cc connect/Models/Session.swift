@@ -110,6 +110,26 @@ final class Session {
         return false
     }
 
+    /// 最近一条消息预览（用于列表显示）
+    var lastMessagePreview: String? {
+        // 找最近的 claude 或 user_input 消息
+        let relevantMessages = messages
+            .filter { $0.type == .claude || $0.type == .userInput }
+            .sorted { $0.timestamp > $1.timestamp }
+
+        guard let lastMessage = relevantMessages.first else { return nil }
+
+        // 截取前 50 个字符，移除换行
+        let content = lastMessage.content
+            .replacingOccurrences(of: "\n", with: " ")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+
+        if content.count > 50 {
+            return String(content.prefix(50)) + "..."
+        }
+        return content.isEmpty ? nil : content
+    }
+
     init(
         id: String = UUID().uuidString,
         name: String = "新会话",

@@ -285,6 +285,14 @@ struct CCSessionCard: View {
                         .font(.ccHeadline)
                         .foregroundColor(CCColor.textPrimary)
 
+                    // 最近消息预览
+                    if let preview = session.lastMessagePreview {
+                        Text(preview)
+                            .font(.ccCaption)
+                            .foregroundColor(CCColor.textSecondary)
+                            .lineLimit(1)
+                    }
+
                     // 状态 + 时间
                     HStack(spacing: CCSpacing.xs) {
                         Text(session.status.displayText)
